@@ -3,8 +3,15 @@
 # =============================================================================
 
 variables:
+  # Docker BuildKit and Rootless configuration
   DOCKER_DRIVER: overlay2
+  DOCKER_BUILDKIT: "1"
+  BUILDKIT_PROGRESS: plain
+  # Rootless Docker configuration
+  DOCKER_HOST: tcp://docker:2376
   DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_VERIFY: "1"
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
 
 stages:
   - build
@@ -34,19 +41,24 @@ build-and-test:
     expire_in: 1 day
 
 # =============================================================================
-# Docker Image
+# Docker Image (BuildKit + Rootless)
 # =============================================================================
 
 docker-build:
   stage: docker
   image: docker:24
   services:
-    - docker:24-dind
+    - docker:24-dind-rootless
   before_script:
+    - until docker info; do sleep 1; done
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - echo "Building Docker image..."
-    - docker build -t $CI_REGISTRY_IMAGE:latest .
+    - echo "Building Docker image with BuildKit (rootless)..."
+    - |
+      docker build \
+        --progress=plain \
+        -t $CI_REGISTRY_IMAGE:latest \
+        .
     - docker push $CI_REGISTRY_IMAGE:latest
     - echo "✅ Docker image pushed"
   only:
@@ -57,12 +69,18 @@ docker-release:
   stage: docker
   image: docker:24
   services:
-    - docker:24-dind
+    - docker:24-dind-rootless
   before_script:
+    - until docker info; do sleep 1; done
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - echo "Building release image..."
-    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG -t $CI_REGISTRY_IMAGE:latest .
+    - echo "Building release image with BuildKit (rootless)..."
+    - |
+      docker build \
+        --progress=plain \
+        -t $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG \
+        -t $CI_REGISTRY_IMAGE:latest \
+        .
     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
     - docker push $CI_REGISTRY_IMAGE:latest
     - echo "✅ Released $CI_COMMIT_TAG"
