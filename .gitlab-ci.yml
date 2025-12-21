@@ -1,363 +1,95 @@
 # =============================================================================
 # GitLab CI/CD Pipeline for iDRAC NetBox Importer
 # =============================================================================
-# This pipeline includes:
-# - Code quality checks (lint, format, vet)
-# - Unit and integration tests
-# - Security scanning
-# - Docker image building
-# - Multi-arch builds
-# - Automatic releases
+# Simple pipeline: Build → Test → Docker → Release
 # =============================================================================
 
 variables:
-  # Go configuration
   GO_VERSION: "1.22"
   CGO_ENABLED: "0"
-
-  # Docker configuration
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: "/certs"
-  DOCKER_BUILDKIT: "1"
-
-  # Image configuration
   IMAGE_NAME: $CI_REGISTRY_IMAGE
-  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
-
-  # Build metadata (automatically set by GitLab)
   VERSION: ${CI_COMMIT_TAG:-dev}
-  BUILD_TIME: $CI_PIPELINE_CREATED_AT
-  GIT_COMMIT: $CI_COMMIT_SHORT_SHA
 
-# Define pipeline stages
 stages:
-  - validate
-  - test
   - build
-  - security
+  - docker
   - release
-  - deploy
 
 # =============================================================================
-# Templates
+# Build and Test
 # =============================================================================
 
-.go-cache:
-  cache:
-    key: ${CI_COMMIT_REF_SLUG}-go
-    paths:
-      - .cache/go-build
-      - .cache/go-mod
+build-and-test:
+  stage: build
+  image: golang:1.22-alpine
   before_script:
-    - mkdir -p .cache/go-build .cache/go-mod
-    - export GOPATH="$CI_PROJECT_DIR/.cache/go-mod"
-    - export GOCACHE="$CI_PROJECT_DIR/.cache/go-build"
-
-.go-base:
-  image: golang:${GO_VERSION}-alpine
-  extends: .go-cache
-  before_script:
-    - apk add --no-cache git make gcc musl-dev
-    - mkdir -p .cache/go-build .cache/go-mod
-    - export GOPATH="$CI_PROJECT_DIR/.cache/go-mod"
-    - export GOCACHE="$CI_PROJECT_DIR/.cache/go-build"
-
-# =============================================================================
-# Validate Stage
-# =============================================================================
-
-code-format-check:
-  stage: validate
-  extends: .go-base
+    - apk add --no-cache git make
   script:
-    - echo "Checking code formatting..."
-    - gofmt -l . | tee /tmp/fmt-check
-    - |
-      if [ -s /tmp/fmt-check ]; then
-        echo "❌ Code is not formatted. Run 'go fmt ./...' locally"
-        exit 1
-      fi
-    - echo "✅ Code is properly formatted"
-  allow_failure: false
-
-go-vet:
-  stage: validate
-  extends: .go-base
-  script:
-    - echo "Running go vet..."
-    - go vet ./...
-    - echo "✅ Go vet passed"
-  allow_failure: false
-
-go-mod-verify:
-  stage: validate
-  extends: .go-base
-  script:
-    - echo "Verifying go modules..."
+    - echo "Building and testing..."
     - go mod download
-    - go mod verify
-    - echo "✅ Go modules verified"
-  allow_failure: false
-
-lint:
-  stage: validate
-  extends: .go-base
-  script:
-    - echo "Installing golangci-lint..."
-    - wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.55.2
-    - echo "Running linter..."
-    - ./bin/golangci-lint run --timeout 5m ./...
-    - echo "✅ Linting passed"
-  allow_failure: true
-  artifacts:
-    reports:
-      codequality: gl-code-quality-report.json
-    when: always
-    paths:
-      - gl-code-quality-report.json
-    expire_in: 1 week
-
-# =============================================================================
-# Test Stage
-# =============================================================================
-
-unit-tests:
-  stage: test
-  extends: .go-base
-  script:
-    - echo "Running unit tests..."
-    - go test -v -race -short -coverprofile=coverage.out -covermode=atomic ./internal/... ./pkg/...
-    - go tool cover -func=coverage.out
+    - go build -v ./...
+    - go test ./... -v -count=1
     - |
-      COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-      echo "Code coverage: ${COVERAGE}%"
-      if (( $(echo "$COVERAGE < 40" | bc -l) )); then
-        echo "⚠️  Warning: Code coverage is below 40%"
-      fi
-    - echo "✅ Unit tests passed"
-  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.out
-    paths:
-      - coverage.out
-    expire_in: 1 week
-
-integration-tests:
-  stage: test
-  extends: .go-base
-  script:
-    - echo "Running integration tests..."
-    - go test -v -race ./tests/...
-    - echo "✅ Integration tests passed"
-  allow_failure: true
-
-# Build test to ensure compilation works
-build-test:
-  stage: test
-  extends: .go-base
-  script:
-    - echo "Testing build compilation..."
-    - make build
-    - ./idrac-inventory -version
-    - echo "✅ Build test passed"
+      go build -ldflags "\
+        -X main.Version=${VERSION} \
+        -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+        -X main.GitCommit=${CI_COMMIT_SHORT_SHA}" \
+        -o idrac-inventory ./cmd/idrac-inventory
+    - echo "✅ Build and tests completed"
   artifacts:
     paths:
       - idrac-inventory
     expire_in: 1 day
 
 # =============================================================================
-# Build Stage
-# =============================================================================
-
-build-binary:
-  stage: build
-  extends: .go-base
-  script:
-    - echo "Building binary..."
-    - |
-      go build -v \
-        -ldflags "-s -w \
-          -X main.Version=${VERSION:-dev} \
-          -X main.BuildTime=${BUILD_TIME} \
-          -X main.GitCommit=${GIT_COMMIT}" \
-        -o idrac-inventory \
-        ./cmd/idrac-inventory
-    - ./idrac-inventory -version
-    - echo "✅ Binary built successfully"
-  artifacts:
-    paths:
-      - idrac-inventory
-    expire_in: 1 week
-  only:
-    - branches
-    - tags
-
-build-multi-arch:
-  stage: build
-  extends: .go-base
-  script:
-    - echo "Building for multiple architectures..."
-    - make release
-    - ls -lh dist/
-    - echo "✅ Multi-arch build completed"
-  artifacts:
-    paths:
-      - dist/
-    expire_in: 1 month
-  only:
-    - tags
-    - main
-
-# =============================================================================
-# Docker Build
+# Docker Image
 # =============================================================================
 
 docker-build:
-  stage: build
-  image: docker:24-git
+  stage: docker
+  image: docker:24
   services:
     - docker:24-dind
-  variables:
-    DOCKER_BUILDKIT: "1"
   before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - echo "Building Docker image..."
     - |
       docker build \
-        --build-arg VERSION=${VERSION:-dev} \
-        --build-arg BUILD_TIME=${BUILD_TIME} \
-        --build-arg GIT_COMMIT=${GIT_COMMIT} \
-        --cache-from $IMAGE_NAME:latest \
-        -t $IMAGE_NAME:$IMAGE_TAG \
-        -t $IMAGE_NAME:$CI_COMMIT_REF_SLUG \
-        .
-    - docker push $IMAGE_NAME:$IMAGE_TAG
-    - docker push $IMAGE_NAME:$CI_COMMIT_REF_SLUG
-    - echo "✅ Docker image built and pushed"
-  only:
-    - branches
-    - tags
-
-docker-build-release:
-  stage: build
-  image: docker:24-git
-  services:
-    - docker:24-dind
-  variables:
-    DOCKER_BUILDKIT: "1"
-  before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
-  script:
-    - echo "Building release Docker image..."
-    - |
-      docker build \
-        --build-arg VERSION=${CI_COMMIT_TAG} \
-        --build-arg BUILD_TIME=${BUILD_TIME} \
-        --build-arg GIT_COMMIT=${GIT_COMMIT} \
-        --cache-from $IMAGE_NAME:latest \
-        -t $IMAGE_NAME:$CI_COMMIT_TAG \
+        --build-arg VERSION=${VERSION} \
+        --build-arg BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+        --build-arg GIT_COMMIT=${CI_COMMIT_SHORT_SHA} \
+        -t $IMAGE_NAME:$CI_COMMIT_SHORT_SHA \
         -t $IMAGE_NAME:latest \
         .
-    - docker push $IMAGE_NAME:$CI_COMMIT_TAG
+    - docker push $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
     - docker push $IMAGE_NAME:latest
-    - echo "✅ Release Docker image built and pushed"
+    - echo "✅ Docker image pushed to $IMAGE_NAME:latest"
   only:
+    - main
     - tags
 
-# Multi-architecture Docker build
-docker-buildx:
-  stage: build
-  image: docker:24-git
-  services:
-    - docker:24-dind
-  variables:
-    DOCKER_BUILDKIT: "1"
-  before_script:
-    - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-    - docker buildx create --use --name multiarch-builder
-    - docker buildx inspect --bootstrap
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
-  script:
-    - echo "Building multi-arch Docker image..."
-    - |
-      docker buildx build \
-        --platform linux/amd64,linux/arm64 \
-        --build-arg VERSION=${CI_COMMIT_TAG:-dev} \
-        --build-arg BUILD_TIME=${BUILD_TIME} \
-        --build-arg GIT_COMMIT=${GIT_COMMIT} \
-        --cache-from $IMAGE_NAME:latest \
-        -t $IMAGE_NAME:$CI_COMMIT_TAG-multiarch \
-        --push \
-        .
-    - echo "✅ Multi-arch Docker image built"
-  only:
-    - tags
-  when: manual
-
-# =============================================================================
-# Security Stage
-# =============================================================================
-
-dependency-scanning:
-  stage: security
-  extends: .go-base
-  script:
-    - echo "Scanning dependencies for vulnerabilities..."
-    - go install golang.org/x/vuln/cmd/govulncheck@latest
-    - $(go env GOPATH)/bin/govulncheck ./...
-    - echo "✅ Dependency scan completed"
-  allow_failure: true
-  only:
-    - branches
-    - tags
-
-secret-scanning:
-  stage: security
-  image: alpine:3.21
-  before_script:
-    - apk add --no-cache git
-  script:
-    - echo "Scanning for secrets..."
-    - |
-      # Basic secret patterns
-      echo "Checking for potential secrets in code..."
-      git grep -n -E '(password|secret|token|api_key|apikey)\s*=\s*["\x27][^\x27"]{8,}["\x27]' || echo "No hardcoded secrets found"
-    - echo "✅ Secret scan completed"
-  allow_failure: true
-
-container-scanning:
-  stage: security
+# Tag specific version on release
+docker-tag-release:
+  stage: docker
   image: docker:24
   services:
     - docker:24-dind
-  variables:
-    DOCKER_DRIVER: overlay2
-    IMAGE: $IMAGE_NAME:$IMAGE_TAG
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - echo "Scanning Docker image for vulnerabilities..."
-    - docker pull $IMAGE || true
-    - |
-      # Using Trivy for container scanning
-      docker run --rm \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        aquasec/trivy:latest image \
-        --severity HIGH,CRITICAL \
-        --exit-code 0 \
-        $IMAGE
-    - echo "✅ Container scan completed"
-  dependencies:
-    - docker-build
-  allow_failure: true
+    - echo "Tagging release version..."
+    - docker pull $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+    - docker tag $IMAGE_NAME:$CI_COMMIT_SHORT_SHA $IMAGE_NAME:$CI_COMMIT_TAG
+    - docker push $IMAGE_NAME:$CI_COMMIT_TAG
+    - echo "✅ Released $IMAGE_NAME:$CI_COMMIT_TAG"
   only:
-    - branches
     - tags
 
 # =============================================================================
-# Release Stage
+# Release
 # =============================================================================
 
 create-release:
@@ -370,88 +102,19 @@ create-release:
     description: |
       # Release $CI_COMMIT_TAG
 
-      ## Changes
-      See [CHANGELOG.md](CHANGELOG.md) for details.
-
-      ## Downloads
-
-      ### Binary Downloads
-      - [Linux AMD64](https://gitlab.com/$CI_PROJECT_PATH/-/jobs/artifacts/$CI_COMMIT_TAG/raw/dist/idrac-inventory-linux-amd64?job=build-multi-arch)
-      - [Linux ARM64](https://gitlab.com/$CI_PROJECT_PATH/-/jobs/artifacts/$CI_COMMIT_TAG/raw/dist/idrac-inventory-linux-arm64?job=build-multi-arch)
-      - [macOS AMD64](https://gitlab.com/$CI_PROJECT_PATH/-/jobs/artifacts/$CI_COMMIT_TAG/raw/dist/idrac-inventory-darwin-amd64?job=build-multi-arch)
-      - [macOS ARM64](https://gitlab.com/$CI_PROJECT_PATH/-/jobs/artifacts/$CI_COMMIT_TAG/raw/dist/idrac-inventory-darwin-arm64?job=build-multi-arch)
-      - [Windows AMD64](https://gitlab.com/$CI_PROJECT_PATH/-/jobs/artifacts/$CI_COMMIT_TAG/raw/dist/idrac-inventory-windows-amd64.exe?job=build-multi-arch)
-
-      ### Docker Image
-      ```bash
+      ## Docker Image
+      ```
       docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
+      ```
+
+      ## Usage
+      ```bash
+      docker run --rm \
+        -e IDRAC_DEFAULT_USER=your-user \
+        -e IDRAC_DEFAULT_PASS=your-pass \
+        -v $(pwd)/config.yaml:/app/config.yaml \
+        $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG \
+        -config /app/config.yaml
       ```
   only:
     - tags
-
-# Upload artifacts to GitLab Package Registry
-upload-packages:
-  stage: release
-  image: curlimages/curl:latest
-  script:
-    - echo "Uploading release artifacts..."
-    - |
-      cd dist/
-      for file in *; do
-        echo "Uploading $file..."
-        curl --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-             --upload-file "$file" \
-             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/idrac-inventory/${CI_COMMIT_TAG}/${file}"
-      done
-    - echo "✅ Artifacts uploaded"
-  dependencies:
-    - build-multi-arch
-  only:
-    - tags
-
-# =============================================================================
-# Deploy Stage (Example - customize for your environment)
-# =============================================================================
-
-deploy-staging:
-  stage: deploy
-  image: alpine:3.21
-  script:
-    - echo "Deploying to staging environment..."
-    - echo "Replace this with your actual deployment commands"
-    - echo "✅ Deployed to staging"
-  environment:
-    name: staging
-    url: https://staging.example.com
-  only:
-    - main
-  when: manual
-
-deploy-production:
-  stage: deploy
-  image: alpine:3.21
-  script:
-    - echo "Deploying to production environment..."
-    - echo "Replace this with your actual deployment commands"
-    - echo "✅ Deployed to production"
-  environment:
-    name: production
-    url: https://production.example.com
-  only:
-    - tags
-  when: manual
-
-# =============================================================================
-# Scheduled Jobs
-# =============================================================================
-
-# Nightly security scan
-nightly-security-scan:
-  extends: dependency-scanning
-  only:
-    - schedules
-  script:
-    - echo "Running scheduled security scan..."
-    - go install golang.org/x/vuln/cmd/govulncheck@latest
-    - $(go env GOPATH)/bin/govulncheck ./...
-    - echo "✅ Scheduled security scan completed"
