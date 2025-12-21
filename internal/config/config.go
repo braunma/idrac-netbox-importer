@@ -10,20 +10,32 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yourusername/idrac-inventory/pkg/defaults"
-	"github.com/yourusername/idrac-inventory/pkg/errors"
 	"gopkg.in/yaml.v3"
+	"idrac-inventory/pkg/defaults"
+	"idrac-inventory/pkg/errors"
 )
 
 // Config is the root configuration structure.
 type Config struct {
-	NetBox      NetBoxConfig   `yaml:"netbox"`
-	Servers     []ServerConfig `yaml:"servers"`
-	Defaults    DefaultsConfig `yaml:"defaults"`
-	Concurrency int            `yaml:"concurrency"`
-	Logging     LoggingConfig  `yaml:"logging"`
-	Retry       RetryConfig    `yaml:"retry"`
-	HTTP        HTTPConfig     `yaml:"http"`
+	NetBox       NetBoxConfig   `yaml:"netbox"`
+	Servers      []ServerConfig `yaml:"servers"`
+	ServerGroups []ServerGroup  `yaml:"server_groups,omitempty"`
+	Defaults     DefaultsConfig `yaml:"defaults"`
+	Concurrency  int            `yaml:"concurrency"`
+	Logging      LoggingConfig  `yaml:"logging"`
+	Retry        RetryConfig    `yaml:"retry"`
+	HTTP         HTTPConfig     `yaml:"http"`
+}
+
+// ServerGroup holds configuration for a group of servers with IP ranges.
+// This allows specifying different credentials for different IP ranges.
+type ServerGroup struct {
+	Name               string   `yaml:"name,omitempty"`
+	IPRanges           []string `yaml:"ip_ranges"`
+	Username           string   `yaml:"username,omitempty"`
+	Password           string   `yaml:"password,omitempty"`
+	InsecureSkipVerify *bool    `yaml:"insecure_skip_verify,omitempty"`
+	TimeoutSeconds     *int     `yaml:"timeout_seconds,omitempty"`
 }
 
 // NetBoxConfig holds NetBox API configuration.
@@ -171,6 +183,11 @@ func Parse(data []byte) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
+	// Expand server groups into individual servers
+	if err := cfg.expandServerGroups(); err != nil {
+		return nil, fmt.Errorf("failed to expand server groups: %w", err)
+	}
+
 	// Apply environment variable overrides
 	cfg.applyEnvOverrides()
 
@@ -183,6 +200,54 @@ func Parse(data []byte) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// expandServerGroups expands IP ranges from server_groups into individual servers.
+func (c *Config) expandServerGroups() error {
+	if len(c.ServerGroups) == 0 {
+		return nil
+	}
+
+	var expandedServers []ServerConfig
+
+	for i, group := range c.ServerGroups {
+		if len(group.IPRanges) == 0 {
+			return fmt.Errorf("server_group[%d]: no ip_ranges specified", i)
+		}
+
+		// Expand all IP ranges in this group
+		ips, err := ExpandIPRanges(group.IPRanges)
+		if err != nil {
+			groupName := group.Name
+			if groupName == "" {
+				groupName = fmt.Sprintf("group %d", i)
+			}
+			return fmt.Errorf("server_group %s: %w", groupName, err)
+		}
+
+		// Create a ServerConfig for each IP
+		for _, ip := range ips {
+			srv := ServerConfig{
+				Host:               ip,
+				Username:           group.Username,
+				Password:           group.Password,
+				InsecureSkipVerify: group.InsecureSkipVerify,
+				TimeoutSeconds:     group.TimeoutSeconds,
+			}
+
+			// Use group name + IP as the server name if group has a name
+			if group.Name != "" {
+				srv.Name = fmt.Sprintf("%s - %s", group.Name, ip)
+			}
+
+			expandedServers = append(expandedServers, srv)
+		}
+	}
+
+	// Append expanded servers to existing servers
+	c.Servers = append(c.Servers, expandedServers...)
+
+	return nil
 }
 
 // applyEnvOverrides applies environment variable overrides to the config.
@@ -245,9 +310,9 @@ func (c *Config) applyDefaults() {
 func (c *Config) Validate() error {
 	multiErr := &errors.MultiError{}
 
-	// Validate servers
+	// Validate servers (note: server_groups are already expanded into servers at this point)
 	if len(c.Servers) == 0 {
-		multiErr.Add(errors.NewConfigError("servers", "no servers configured"))
+		multiErr.Add(errors.NewConfigError("servers", "no servers configured (provide 'servers' or 'server_groups')"))
 	}
 
 	for i, srv := range c.Servers {

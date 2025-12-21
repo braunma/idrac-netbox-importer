@@ -12,13 +12,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yourusername/idrac-inventory/internal/config"
-	"github.com/yourusername/idrac-inventory/internal/models"
-	"github.com/yourusername/idrac-inventory/internal/redfish"
-	"github.com/yourusername/idrac-inventory/pkg/defaults"
-	"github.com/yourusername/idrac-inventory/pkg/errors"
-	"github.com/yourusername/idrac-inventory/pkg/logging"
 	"go.uber.org/zap"
+	"idrac-inventory/internal/config"
+	"idrac-inventory/internal/models"
+	"idrac-inventory/internal/redfish"
+	"idrac-inventory/pkg/defaults"
+	"idrac-inventory/pkg/errors"
+	"idrac-inventory/pkg/logging"
 )
 
 // Scanner manages hardware inventory scanning across multiple iDRAC servers.

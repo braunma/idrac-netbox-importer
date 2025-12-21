@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yourusername/idrac-inventory/internal/config"
-	"github.com/yourusername/idrac-inventory/internal/models"
-	"github.com/yourusername/idrac-inventory/pkg/logging"
+	"idrac-inventory/internal/config"
+	"idrac-inventory/internal/models"
+	"idrac-inventory/pkg/logging"
 )
 
 func init() {

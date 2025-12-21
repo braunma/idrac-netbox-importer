@@ -1,4 +1,4 @@
-module github.com/yourusername/idrac-inventory
+module idrac-inventory
 
 go 1.22
 

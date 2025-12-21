@@ -323,14 +323,15 @@ Edit `.gitlab-ci.yml` deployment jobs with your actual deployment commands:
 deploy-production:
   stage: deploy
   image: alpine:3.21
-  before_script:
-    - apk add --no-cache openssh-client
-    - eval $(ssh-agent -s)
-    - echo "$PRODUCTION_SSH_KEY" | tr -d '\r' | ssh-add -
   script:
-    # Your deployment commands here
-    - ssh user@your-server "docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
-    - ssh user@your-server "docker-compose -f /app/docker-compose.yml up -d"
+    - echo "Deploying to production environment..."
+    # Replace with your actual deployment commands
+    # Examples:
+    # - Docker Registry pull and run on target server
+    # - Kubernetes deployment update
+    # - Docker Compose service update
+    # - Custom deployment script execution
+    - echo "✅ Deployed to production"
   environment:
     name: production
   only:

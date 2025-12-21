@@ -9,7 +9,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/yourusername/idrac-inventory/internal/models"
+	"idrac-inventory/internal/models"
 )
 
 // Formatter defines the interface for output formatters.

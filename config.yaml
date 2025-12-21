@@ -141,6 +141,53 @@ servers:
     name: "secure-server-01"
     insecure_skip_verify: false
 
+# -----------------------------------------------------------------------------
+# Server Groups with IP Ranges
+# -----------------------------------------------------------------------------
+# Use server_groups to define multiple servers using IP ranges with specific
+# credentials. This is useful when you have different credential sets for
+# different network segments.
+#
+# Supported formats:
+#   - Single IP: "10.10.10.5"
+#   - IP Range: "10.10.10.1-10.10.10.25"
+#   - Multiple ranges: ["10.10.10.1-10.10.10.25", "10.10.10.58-10.10.10.80"]
+#   - CIDR notation: "192.168.1.0/24" (expands to 192.168.1.1-254)
+#
+# server_groups:
+#   # Example: Data Center 1 - Production servers
+#   - name: "DC1 Production"
+#     ip_ranges:
+#       - "10.10.10.1-10.10.10.25"
+#       - "10.10.10.58-10.10.10.80"
+#     username: "${DC1_PROD_USER}"
+#     password: "${DC1_PROD_PASS}"
+#     timeout_seconds: 60
+#
+#   # Example: Data Center 2 - Development servers
+#   - name: "DC2 Development"
+#     ip_ranges:
+#       - "192.168.1.1-192.168.1.50"
+#     username: "${DC2_DEV_USER}"
+#     password: "${DC2_DEV_PASS}"
+#
+#   # Example: Remote site using CIDR
+#   - name: "Remote Office"
+#     ip_ranges:
+#       - "172.16.0.0/24"
+#     username: "remote-admin"
+#     password: "${REMOTE_PASS}"
+#     timeout_seconds: 120
+#
+#   # Example: Mixed ranges with default credentials
+#   - ip_ranges:
+#       - "10.20.30.1-10.20.30.10"
+#       - "10.20.30.100"
+#     # Uses default username/password from 'defaults' section above
+#
+# Note: server_groups are expanded into individual servers during config loading.
+# You can use both 'servers' and 'server_groups' in the same configuration.
+
 # =============================================================================
 # CI/CD Integration Examples
 # =============================================================================

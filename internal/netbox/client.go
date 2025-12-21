@@ -12,11 +12,11 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/yourusername/idrac-inventory/internal/config"
-	"github.com/yourusername/idrac-inventory/internal/models"
-	"github.com/yourusername/idrac-inventory/pkg/defaults"
-	"github.com/yourusername/idrac-inventory/pkg/logging"
 	"go.uber.org/zap"
+	"idrac-inventory/internal/config"
+	"idrac-inventory/internal/models"
+	"idrac-inventory/pkg/defaults"
+	"idrac-inventory/pkg/logging"
 )
 
 // Client provides methods for interacting with the NetBox API.

@@ -7,6 +7,8 @@ A powerful Dell iDRAC hardware inventory collection tool that automatically gath
 - **Automated Hardware Discovery**: Scans Dell iDRAC servers via Redfish API
 - **Comprehensive Inventory**: Collects CPU, memory, storage, and system information
 - **NetBox Integration**: Automatically syncs hardware data to NetBox custom fields
+- **IP Range Scanning**: Define server groups with IP ranges and CIDR notation for bulk scanning
+- **Multi-Credential Support**: Different username/password combinations for different network segments
 - **Parallel Scanning**: Configurable concurrency for fast multi-server inventory
 - **Multiple Output Formats**: Console, JSON, CSV, and table formats
 - **Connection Validation**: Test connectivity without running full scans
@@ -38,8 +40,8 @@ Requirements:
 - Access to Dell iDRAC servers with Redfish API enabled
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/idrac-netbox-importer.git
+# Clone the repository from your GitLab
+git clone <your-gitlab-url>/idrac-netbox-importer.git
 cd idrac-netbox-importer
 
 # Build the binary
@@ -161,6 +163,61 @@ servers:
     username: admin                       # Per-server credentials
     password: different-password
 ```
+
+### IP Range Scanning
+
+You can use `server_groups` to define multiple servers using IP ranges with specific credentials. This is especially useful when you have different credential sets for different network segments:
+
+```yaml
+# Define server groups with IP ranges
+server_groups:
+  # Production servers in Data Center 1
+  - name: "DC1 Production"
+    ip_ranges:
+      - "10.10.10.1-10.10.10.25"        # Range of IPs
+      - "10.10.10.58-10.10.10.80"       # Multiple ranges per group
+    username: "${DC1_PROD_USER}"
+    password: "${DC1_PROD_PASS}"
+    timeout_seconds: 60
+
+  # Development servers in Data Center 2
+  - name: "DC2 Development"
+    ip_ranges:
+      - "192.168.1.1-192.168.1.50"
+    username: "${DC2_DEV_USER}"
+    password: "${DC2_DEV_PASS}"
+
+  # Remote site using CIDR notation
+  - name: "Remote Office"
+    ip_ranges:
+      - "172.16.0.0/24"                 # CIDR expands to 172.16.0.1-254
+    username: "remote-admin"
+    password: "${REMOTE_PASS}"
+    timeout_seconds: 120
+
+  # Group using default credentials
+  - ip_ranges:
+      - "10.20.30.1-10.20.30.10"
+      - "10.20.30.100"                  # Single IP also works
+    # Omit username/password to use defaults
+
+# You can use both 'servers' and 'server_groups' together
+servers:
+  - host: 192.168.1.254
+    name: "Special Server"
+```
+
+**Supported IP Range Formats:**
+- Single IP: `"10.10.10.5"`
+- IP Range: `"10.10.10.1-10.10.10.25"` (expands to all IPs from .1 to .25)
+- CIDR Notation: `"192.168.1.0/24"` (expands to 192.168.1.1-254, excluding network/broadcast)
+- Multiple ranges: Define multiple `ip_ranges` entries in a single group
+
+**Notes:**
+- `server_groups` are expanded into individual servers during config loading
+- Each server group can have its own credentials, overriding the defaults
+- Maximum 10,000 IPs per range (safety limit)
+- You can mix `servers` and `server_groups` in the same configuration
 
 ### Environment Variable Substitution
 
@@ -692,8 +749,8 @@ Contributions are welcome! Please:
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/yourusername/idrac-netbox-importer/issues
-- Documentation: https://github.com/yourusername/idrac-netbox-importer/wiki
+- GitLab Issues: Use your GitLab instance's issue tracker
+- Documentation: See the docs/ directory and markdown files in this repository
 
 ## Acknowledgments
 
