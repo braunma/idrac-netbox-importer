@@ -1,0 +1,242 @@
+// Package models defines the core data structures used throughout the application.
+// These models represent hardware information collected from iDRAC systems.
+package models
+
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
+
+// ServerInfo contains all hardware information collected from a single server.
+type ServerInfo struct {
+	// Connection details
+	Host        string    `json:"host"`
+	Name        string    `json:"name,omitempty"`
+	CollectedAt time.Time `json:"collected_at"`
+
+	// Error tracking - nil if collection succeeded
+	Error error `json:"-"`
+	// ErrorMessage is the string representation for JSON serialization
+	ErrorMessage string `json:"error,omitempty"`
+
+	// System identification
+	Model        string `json:"model"`
+	Manufacturer string `json:"manufacturer"`
+	SerialNumber string `json:"serial_number"`
+	ServiceTag   string `json:"service_tag"`
+	BiosVersion  string `json:"bios_version"`
+	HostName     string `json:"hostname"`
+	PowerState   string `json:"power_state"`
+
+	// CPU information
+	CPUs     []CPUInfo `json:"cpus"`
+	CPUCount int       `json:"cpu_count"`
+	CPUModel string    `json:"cpu_model"`
+
+	// Memory information
+	Memory           []MemoryInfo `json:"memory"`
+	TotalMemoryGiB   float64      `json:"total_memory_gib"`
+	MemorySlotsTotal int          `json:"memory_slots_total"`
+	MemorySlotsUsed  int          `json:"memory_slots_used"`
+	MemorySlotsFree  int          `json:"memory_slots_free"`
+
+	// Storage information
+	Drives         []DriveInfo `json:"drives"`
+	DriveCount     int         `json:"drive_count"`
+	TotalStorageTB float64     `json:"total_storage_tb"`
+}
+
+// IsValid returns true if the server info was collected without errors.
+func (s *ServerInfo) IsValid() bool {
+	return s.Error == nil
+}
+
+// Summary returns a brief one-line summary of the server.
+func (s *ServerInfo) Summary() string {
+	if s.Error != nil {
+		return fmt.Sprintf("%s: ERROR - %v", s.Host, s.Error)
+	}
+	return fmt.Sprintf("%s: %s, %d CPUs, %.0f GiB RAM (%d/%d slots), %d drives (%.2f TB)",
+		s.Host, s.Model, s.CPUCount, s.TotalMemoryGiB,
+		s.MemorySlotsUsed, s.MemorySlotsTotal, s.DriveCount, s.TotalStorageTB)
+}
+
+// MarshalJSON implements custom JSON marshaling to include error message.
+func (s ServerInfo) MarshalJSON() ([]byte, error) {
+	type Alias ServerInfo
+	aux := struct {
+		Alias
+		ErrorMessage string `json:"error,omitempty"`
+	}{
+		Alias: Alias(s),
+	}
+	if s.Error != nil {
+		aux.ErrorMessage = s.Error.Error()
+	}
+	return json.Marshal(aux)
+}
+
+// GetDisplayName returns the best available name for the server.
+func (s *ServerInfo) GetDisplayName() string {
+	if s.Name != "" {
+		return s.Name
+	}
+	if s.HostName != "" {
+		return s.HostName
+	}
+	return s.Host
+}
+
+// CPUInfo contains detailed information about a single processor.
+type CPUInfo struct {
+	Socket            string `json:"socket"`
+	Model             string `json:"model"`
+	Manufacturer      string `json:"manufacturer"`
+	Cores             int    `json:"cores"`
+	Threads           int    `json:"threads"`
+	MaxSpeedMHz       int    `json:"max_speed_mhz"`
+	OperatingSpeedMHz int    `json:"operating_speed_mhz"`
+	Health            string `json:"health"`
+}
+
+// String returns a human-readable representation of the CPU.
+func (c CPUInfo) String() string {
+	return fmt.Sprintf("%s: %s (%d cores/%d threads @ %d MHz)",
+		c.Socket, c.Model, c.Cores, c.Threads, c.MaxSpeedMHz)
+}
+
+// TotalSpeed returns the total theoretical speed (cores * speed).
+func (c CPUInfo) TotalSpeed() int {
+	return c.Cores * c.MaxSpeedMHz
+}
+
+// MemoryInfo contains detailed information about a single memory module or slot.
+type MemoryInfo struct {
+	Slot         string `json:"slot"`
+	CapacityMiB  int    `json:"capacity_mib"`
+	Type         string `json:"type"`
+	SpeedMHz     int    `json:"speed_mhz"`
+	Manufacturer string `json:"manufacturer"`
+	PartNumber   string `json:"part_number"`
+	SerialNumber string `json:"serial_number"`
+	State        string `json:"state"`
+	Health       string `json:"health"`
+}
+
+// Memory state constants as returned by Redfish API.
+const (
+	MemoryStateEnabled  = "Enabled"
+	MemoryStateAbsent   = "Absent"
+	MemoryStateDisabled = "Disabled"
+)
+
+// IsPopulated returns true if this memory slot contains a DIMM.
+func (m MemoryInfo) IsPopulated() bool {
+	return m.State == MemoryStateEnabled
+}
+
+// IsEmpty returns true if this memory slot is empty.
+func (m MemoryInfo) IsEmpty() bool {
+	return m.State == MemoryStateAbsent
+}
+
+// CapacityGB returns the capacity in gigabytes.
+func (m MemoryInfo) CapacityGB() float64 {
+	return float64(m.CapacityMiB) / 1024
+}
+
+// String returns a human-readable representation of the memory module.
+func (m MemoryInfo) String() string {
+	if m.IsEmpty() {
+		return fmt.Sprintf("%s: [empty]", m.Slot)
+	}
+	return fmt.Sprintf("%s: %.0f GB %s @ %d MHz (%s)",
+		m.Slot, m.CapacityGB(), m.Type, m.SpeedMHz, m.Manufacturer)
+}
+
+// DriveInfo contains detailed information about a single storage drive.
+type DriveInfo struct {
+	Name         string  `json:"name"`
+	Model        string  `json:"model"`
+	Manufacturer string  `json:"manufacturer"`
+	SerialNumber string  `json:"serial_number"`
+	CapacityGB   float64 `json:"capacity_gb"`
+	MediaType    string  `json:"media_type"`
+	Protocol     string  `json:"protocol"`
+	LifeLeftPct  float64 `json:"life_left_pct,omitempty"`
+	Health       string  `json:"health"`
+}
+
+// CapacityTB returns the capacity in terabytes.
+func (d DriveInfo) CapacityTB() float64 {
+	return d.CapacityGB / 1024
+}
+
+// IsSSD returns true if this is a solid-state drive.
+func (d DriveInfo) IsSSD() bool {
+	return d.MediaType == "SSD"
+}
+
+// IsHDD returns true if this is a hard disk drive.
+func (d DriveInfo) IsHDD() bool {
+	return d.MediaType == "HDD"
+}
+
+// String returns a human-readable representation of the drive.
+func (d DriveInfo) String() string {
+	lifeInfo := ""
+	if d.LifeLeftPct > 0 && d.IsSSD() {
+		lifeInfo = fmt.Sprintf(" [%.0f%% life remaining]", d.LifeLeftPct)
+	}
+	return fmt.Sprintf("%s: %.0f GB %s %s (%s)%s",
+		d.Name, d.CapacityGB, d.MediaType, d.Protocol, d.Model, lifeInfo)
+}
+
+// Health status constants.
+const (
+	HealthOK       = "OK"
+	HealthWarning  = "Warning"
+	HealthCritical = "Critical"
+)
+
+// Power state constants.
+const (
+	PowerStateOn          = "On"
+	PowerStateOff         = "Off"
+	PowerStatePoweringOn  = "PoweringOn"
+	PowerStatePoweringOff = "PoweringOff"
+)
+
+// ScanResult contains the result of scanning multiple servers.
+type ScanResult struct {
+	Servers   []ServerInfo    `json:"servers"`
+	Stats     CollectionStats `json:"stats"`
+	StartTime time.Time       `json:"start_time"`
+	EndTime   time.Time       `json:"end_time"`
+}
+
+// CollectionStats provides statistics about a batch collection operation.
+type CollectionStats struct {
+	TotalServers    int           `json:"total_servers"`
+	SuccessfulCount int           `json:"successful_count"`
+	FailedCount     int           `json:"failed_count"`
+	TotalDuration   time.Duration `json:"total_duration"`
+	AverageDuration time.Duration `json:"average_duration"`
+	FastestDuration time.Duration `json:"fastest_duration"`
+	SlowestDuration time.Duration `json:"slowest_duration"`
+}
+
+// SuccessRate returns the percentage of successful collections.
+func (s CollectionStats) SuccessRate() float64 {
+	if s.TotalServers == 0 {
+		return 0
+	}
+	return float64(s.SuccessfulCount) / float64(s.TotalServers) * 100
+}
+
+// String returns a human-readable summary of the collection stats.
+func (s CollectionStats) String() string {
+	return fmt.Sprintf("Scanned %d servers: %d successful, %d failed (%.1f%% success rate) in %s",
+		s.TotalServers, s.SuccessfulCount, s.FailedCount, s.SuccessRate(), s.TotalDuration)
+}

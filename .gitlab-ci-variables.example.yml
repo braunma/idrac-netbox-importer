@@ -1,0 +1,111 @@
+# =============================================================================
+# GitLab CI/CD Variables Example
+# =============================================================================
+# This file shows what variables you should set in GitLab:
+# Settings → CI/CD → Variables
+#
+# DO NOT commit actual credentials to this file!
+# This is just an example/template.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Required Variables for iDRAC Access
+# -----------------------------------------------------------------------------
+# Set these in GitLab CI/CD Variables as "Masked" and "Protected"
+
+IDRAC_DEFAULT_USER:
+  description: "Default username for iDRAC authentication"
+  value: "root"  # Example - replace with your default
+  masked: true
+  protected: false
+
+IDRAC_DEFAULT_PASS:
+  description: "Default password for iDRAC authentication"
+  value: "REPLACE_WITH_YOUR_PASSWORD"
+  masked: true
+  protected: true
+
+# -----------------------------------------------------------------------------
+# NetBox Integration Variables
+# -----------------------------------------------------------------------------
+# Set these if you want to sync inventory to NetBox
+
+NETBOX_URL:
+  description: "NetBox API URL"
+  value: "https://netbox.yourdomain.com"
+  masked: false
+  protected: false
+
+NETBOX_TOKEN:
+  description: "NetBox API authentication token"
+  value: "REPLACE_WITH_YOUR_NETBOX_TOKEN"
+  masked: true
+  protected: true
+
+# -----------------------------------------------------------------------------
+# Optional Configuration Variables
+# -----------------------------------------------------------------------------
+
+IDRAC_LOG_LEVEL:
+  description: "Logging level (debug, info, warn, error)"
+  value: "info"
+  masked: false
+  protected: false
+
+IDRAC_CONCURRENCY:
+  description: "Maximum parallel scans"
+  value: "10"
+  masked: false
+  protected: false
+
+IDRAC_DEFAULT_TIMEOUT:
+  description: "Connection timeout in seconds"
+  value: "60"
+  masked: false
+  protected: false
+
+# =============================================================================
+# How to Set These Variables in GitLab
+# =============================================================================
+#
+# 1. Go to your GitLab project
+# 2. Navigate to: Settings → CI/CD → Variables
+# 3. Click "Add variable"
+# 4. For each variable above:
+#    - Key: Use the variable name (e.g., IDRAC_DEFAULT_USER)
+#    - Value: Enter the actual value
+#    - Type: Variable
+#    - Flags:
+#      - [x] Protect variable (for production secrets)
+#      - [x] Mask variable (for passwords/tokens)
+#      - [ ] Expand variable reference (usually unchecked)
+#
+# =============================================================================
+# Variable Scopes
+# =============================================================================
+#
+# You can set different values for different environments:
+#
+# Example:
+# - IDRAC_DEFAULT_USER (all branches) = "readonly_user"
+# - IDRAC_DEFAULT_USER (main branch) = "admin_user"
+# - IDRAC_DEFAULT_PASS (all branches) = "readonly_pass"
+# - IDRAC_DEFAULT_PASS (main branch) = "admin_pass"
+#
+# This allows read-only access in dev branches and full access in main/production.
+#
+# =============================================================================
+# Using Variables in Your Pipeline
+# =============================================================================
+#
+# Variables are automatically available in all jobs:
+#
+# docker run --rm \
+#   -e IDRAC_DEFAULT_USER=$IDRAC_DEFAULT_USER \
+#   -e IDRAC_DEFAULT_PASS=$IDRAC_DEFAULT_PASS \
+#   -e NETBOX_URL=$NETBOX_URL \
+#   -e NETBOX_TOKEN=$NETBOX_TOKEN \
+#   $CI_REGISTRY_IMAGE:latest \
+#   -config /app/config.yaml -sync
+#
+# =============================================================================

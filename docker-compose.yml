@@ -1,0 +1,74 @@
+# =============================================================================
+# Docker Compose Configuration for iDRAC NetBox Importer
+# =============================================================================
+# Usage:
+#   1. Copy .env.example to .env
+#   2. Edit .env with your credentials
+#   3. Run: docker-compose up
+#
+# For CI/CD: Use GitLab CI/CD variables instead of .env file
+# =============================================================================
+
+version: '3.8'
+
+services:
+  idrac-scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: idrac-inventory:latest
+    container_name: idrac-scanner
+
+    # Use environment variables from .env file or CI/CD
+    environment:
+      # iDRAC Credentials (REQUIRED)
+      - IDRAC_DEFAULT_USER=${IDRAC_DEFAULT_USER}
+      - IDRAC_DEFAULT_PASS=${IDRAC_DEFAULT_PASS}
+
+      # NetBox Integration (OPTIONAL)
+      - NETBOX_URL=${NETBOX_URL:-}
+      - NETBOX_TOKEN=${NETBOX_TOKEN:-}
+
+      # Application Configuration
+      - IDRAC_LOG_LEVEL=${IDRAC_LOG_LEVEL:-info}
+      - IDRAC_LOG_FORMAT=${IDRAC_LOG_FORMAT:-console}
+      - IDRAC_CONCURRENCY=${IDRAC_CONCURRENCY:-5}
+      - IDRAC_DEFAULT_TIMEOUT=${IDRAC_DEFAULT_TIMEOUT:-60}
+
+    # Mount configuration file
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./logs:/app/logs
+
+    # Command to run (override in docker-compose.override.yml if needed)
+    command: ["-config", "/app/config.yaml", "-verbose"]
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Network configuration
+    networks:
+      - idrac-network
+
+    # Health check
+    healthcheck:
+      test: ["/app/idrac-inventory", "-version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+networks:
+  idrac-network:
+    driver: bridge
+
+# =============================================================================
+# Volume for persistent logs (optional)
+# =============================================================================
+volumes:
+  logs:
+    driver: local

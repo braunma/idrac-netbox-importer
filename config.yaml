@@ -1,0 +1,208 @@
+# =============================================================================
+# iDRAC Hardware Inventory Tool - Configuration
+# =============================================================================
+#
+# This file configures the iDRAC inventory collection and NetBox synchronization.
+# All values can be overridden via environment variables for CI/CD integration.
+#
+# Environment Variable Reference:
+# --------------------------------
+# IDRAC_LOG_LEVEL          - Log level: debug, info, warn, error
+# IDRAC_LOG_FORMAT         - Log format: json, console
+# IDRAC_DEFAULT_USER       - Default iDRAC username
+# IDRAC_DEFAULT_PASS       - Default iDRAC password
+# IDRAC_DEFAULT_TIMEOUT    - Default connection timeout (seconds)
+# IDRAC_CONCURRENCY        - Max parallel scans
+# IDRAC_INSECURE_SKIP_VERIFY - Skip TLS verification (true/false)
+# NETBOX_URL               - NetBox API URL
+# NETBOX_TOKEN             - NetBox API token
+# NETBOX_TIMEOUT           - NetBox API timeout (seconds)
+# NETBOX_INSECURE_SKIP_VERIFY - Skip TLS verification for NetBox
+#
+# NetBox Custom Field Names (override if your NetBox uses different names):
+# NETBOX_FIELD_CPU_COUNT, NETBOX_FIELD_CPU_MODEL, NETBOX_FIELD_CPU_CORES,
+# NETBOX_FIELD_CPU_THREADS, NETBOX_FIELD_CPU_SPEED, NETBOX_FIELD_RAM_TOTAL,
+# NETBOX_FIELD_RAM_SLOTS_TOTAL, NETBOX_FIELD_RAM_SLOTS_USED,
+# NETBOX_FIELD_RAM_SLOTS_FREE, NETBOX_FIELD_DISK_COUNT,
+# NETBOX_FIELD_STORAGE_TOTAL, NETBOX_FIELD_BIOS_VERSION,
+# NETBOX_FIELD_POWER_STATE, NETBOX_FIELD_LAST_INVENTORY
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# NetBox Integration
+# -----------------------------------------------------------------------------
+# Configure NetBox API connection for syncing inventory data.
+# Can be fully configured via NETBOX_URL and NETBOX_TOKEN environment variables.
+netbox:
+  # NetBox API URL - Override: NETBOX_URL
+  url: "${NETBOX_URL}"
+  
+  # API Token - Override: NETBOX_TOKEN
+  # Generate at: NetBox > Admin > API Tokens
+  token: "${NETBOX_TOKEN}"
+  
+  # Skip TLS certificate verification - Override: NETBOX_INSECURE_SKIP_VERIFY
+  insecure_skip_verify: false
+  
+  # API timeout in seconds - Override: NETBOX_TIMEOUT
+  timeout_seconds: 30
+
+# -----------------------------------------------------------------------------
+# Default Connection Settings
+# -----------------------------------------------------------------------------
+# These values are used for servers that don't specify their own credentials.
+defaults:
+  # Default iDRAC username - Override: IDRAC_DEFAULT_USER
+  username: "${IDRAC_DEFAULT_USER}"
+  
+  # Default iDRAC password - Override: IDRAC_DEFAULT_PASS
+  password: "${IDRAC_DEFAULT_PASS}"
+  
+  # Connection timeout in seconds - Override: IDRAC_DEFAULT_TIMEOUT
+  timeout_seconds: 60
+  
+  # Skip TLS verification (iDRAC uses self-signed certs) - Override: IDRAC_INSECURE_SKIP_VERIFY
+  insecure_skip_verify: true
+
+# -----------------------------------------------------------------------------
+# Concurrency Settings
+# -----------------------------------------------------------------------------
+# Maximum number of servers to scan in parallel - Override: IDRAC_CONCURRENCY
+# Higher values = faster scans but more network/CPU load
+# Recommended: 5-20 depending on network capacity
+concurrency: 10
+
+# -----------------------------------------------------------------------------
+# Logging Configuration
+# -----------------------------------------------------------------------------
+logging:
+  # Log level: debug, info, warn, error - Override: IDRAC_LOG_LEVEL
+  level: "${IDRAC_LOG_LEVEL:-info}"
+  
+  # Output format: console (human-readable) or json (structured) - Override: IDRAC_LOG_FORMAT
+  format: "${IDRAC_LOG_FORMAT:-console}"
+
+# -----------------------------------------------------------------------------
+# Retry Configuration
+# -----------------------------------------------------------------------------
+retry:
+  # Maximum retry attempts for failed requests
+  max_attempts: 3
+  
+  # Initial delay between retries (supports Go duration format)
+  base_delay: "1s"
+  
+  # Maximum delay between retries (exponential backoff cap)
+  max_delay: "30s"
+
+# -----------------------------------------------------------------------------
+# HTTP Client Configuration
+# -----------------------------------------------------------------------------
+http:
+  # Maximum idle connections to keep open
+  max_idle_conns: 10
+  
+  # Timeout for idle connections (seconds)
+  idle_conn_timeout_seconds: 30
+
+# -----------------------------------------------------------------------------
+# Server List
+# -----------------------------------------------------------------------------
+# Define the iDRAC servers to scan. Each server can override default credentials.
+#
+# Required fields:
+#   - host: IP address or hostname of the iDRAC
+#
+# Optional fields:
+#   - name: Friendly name for display/logging
+#   - username: Override default username
+#   - password: Override default password
+#   - timeout_seconds: Override default timeout
+#   - insecure_skip_verify: Override default TLS setting
+#
+servers:
+  # Example: Server using default credentials
+  - host: "192.168.1.10"
+    name: "web-server-01"
+
+  # Example: Server with custom credentials
+  - host: "192.168.1.11"
+    name: "db-server-01"
+    username: "admin"
+    password: "different-password"
+
+  # Example: Server with custom timeout (slow network)
+  - host: "10.0.0.100"
+    name: "remote-server-01"
+    timeout_seconds: 120
+
+  # Example: Server requiring TLS verification
+  - host: "secure-idrac.example.com"
+    name: "secure-server-01"
+    insecure_skip_verify: false
+
+# =============================================================================
+# CI/CD Integration Examples
+# =============================================================================
+#
+# GitLab CI Example:
+# ------------------
+# variables:
+#   IDRAC_DEFAULT_USER: $IDRAC_USER
+#   IDRAC_DEFAULT_PASS: $IDRAC_PASS
+#   NETBOX_URL: $NETBOX_URL
+#   NETBOX_TOKEN: $NETBOX_TOKEN
+#   IDRAC_LOG_FORMAT: json
+#
+# inventory_scan:
+#   script:
+#     - ./idrac-inventory -config config.yaml -sync -output json
+#
+# GitHub Actions Example:
+# -----------------------
+# env:
+#   IDRAC_DEFAULT_USER: ${{ secrets.IDRAC_USER }}
+#   IDRAC_DEFAULT_PASS: ${{ secrets.IDRAC_PASS }}
+#   NETBOX_URL: ${{ secrets.NETBOX_URL }}
+#   NETBOX_TOKEN: ${{ secrets.NETBOX_TOKEN }}
+#
+# steps:
+#   - run: ./idrac-inventory -config config.yaml -sync
+#
+# Docker Example:
+# ---------------
+# docker run -e IDRAC_DEFAULT_USER=admin \
+#            -e IDRAC_DEFAULT_PASS=secret \
+#            -e NETBOX_URL=https://netbox.example.com \
+#            -e NETBOX_TOKEN=abc123 \
+#            -v $(pwd)/config.yaml:/app/config.yaml \
+#            idrac-inventory -config /app/config.yaml -sync
+#
+# =============================================================================
+# NetBox Custom Fields Setup
+# =============================================================================
+#
+# Create these custom fields in NetBox (Admin → Custom Fields → Add):
+#
+# Object Type: dcim | device
+#
+# | Name                  | Label                | Type    |
+# |-----------------------|----------------------|---------|
+# | hw_cpu_count          | CPU Count            | Integer |
+# | hw_cpu_model          | CPU Model            | Text    |
+# | hw_cpu_cores          | CPU Cores            | Integer |
+# | hw_cpu_threads        | CPU Threads          | Integer |
+# | hw_cpu_speed_mhz      | CPU Speed (MHz)      | Integer |
+# | hw_ram_total_gb       | RAM Total (GB)       | Integer |
+# | hw_ram_slots_total    | RAM Slots Total      | Integer |
+# | hw_ram_slots_used     | RAM Slots Used       | Integer |
+# | hw_ram_slots_free     | RAM Slots Free       | Integer |
+# | hw_disk_count         | Disk Count           | Integer |
+# | hw_storage_total_tb   | Storage Total (TB)   | Text    |
+# | hw_bios_version       | BIOS Version         | Text    |
+# | hw_power_state        | Power State          | Text    |
+# | hw_last_inventory     | Last Inventory       | Text    |
+#
+# If your NetBox uses different field names, override them with environment
+# variables (see NETBOX_FIELD_* variables above).
+# =============================================================================

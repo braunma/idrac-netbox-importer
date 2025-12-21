@@ -1,0 +1,41 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.gitlab-ci.yml
+.github
+
+# Documentation
+*.md
+docs/
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Build artifacts
+dist/
+coverage/
+idrac-inventory
+*.exe
+
+# Test files
+*_test.go
+tests/
+
+# Development
+Makefile
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,65 @@
+# Binaries
+idrac-inventory
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+dist/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage/
+coverage.html
+coverage.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# Build cache
+.cache/
+
+# Environment files - NEVER COMMIT THESE!
+.env
+.env.local
+.env.*.local
+
+# Credentials and secrets - NEVER COMMIT THESE!
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+config.yaml.local
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+
+# CI/CD artifacts (local)
+.gitlab-ci-local/
+
+# Docker volumes
+docker-volumes/
+
+# Claud
+.claude/
+
