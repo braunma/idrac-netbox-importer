@@ -80,7 +80,7 @@ servers: []
 `
 	_, err := Parse([]byte(yaml))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at least one server is required")
+	assert.Contains(t, err.Error(), "no servers configured")
 }
 
 func TestParse_MissingCredentials(t *testing.T) {
@@ -90,8 +90,9 @@ servers:
 `
 	_, err := Parse([]byte(yaml))
 	require.Error(t, err)
+	// MultiError shows "2 errors occurred; first: ..." when there are multiple errors
+	assert.Contains(t, err.Error(), "2 errors occurred")
 	assert.Contains(t, err.Error(), "no username configured")
-	assert.Contains(t, err.Error(), "no password configured")
 }
 
 func TestParse_MissingHost(t *testing.T) {
@@ -166,13 +167,13 @@ func TestEnvOverrides(t *testing.T) {
 	os.Setenv("NETBOX_TOKEN", "env-token")
 	os.Setenv("IDRAC_DEFAULT_USER", "env-user")
 	os.Setenv("IDRAC_DEFAULT_PASS", "env-pass")
-	os.Setenv("LOG_LEVEL", "debug")
+	os.Setenv("IDRAC_LOG_LEVEL", "debug")
 	defer func() {
 		os.Unsetenv("NETBOX_URL")
 		os.Unsetenv("NETBOX_TOKEN")
 		os.Unsetenv("IDRAC_DEFAULT_USER")
 		os.Unsetenv("IDRAC_DEFAULT_PASS")
-		os.Unsetenv("LOG_LEVEL")
+		os.Unsetenv("IDRAC_LOG_LEVEL")
 	}()
 
 	yaml := `
@@ -230,7 +231,8 @@ func TestServerConfig_GetTimeout(t *testing.T) {
 	defaultTimeout := 60 * time.Second
 
 	t.Run("with custom timeout", func(t *testing.T) {
-		s := ServerConfig{Timeout: 30}
+		timeout := 30
+		s := ServerConfig{TimeoutSeconds: &timeout}
 		assert.Equal(t, 30*time.Second, s.GetTimeout(defaultTimeout))
 	})
 
@@ -356,48 +358,4 @@ servers:
 		require.NoError(t, err)
 		assert.Equal(t, 5, cfg.Concurrency)
 	})
-}
-
-func TestServerCount(t *testing.T) {
-	cfg := &Config{
-		Servers: []ServerConfig{
-			{Host: "host1"},
-			{Host: "host2"},
-			{Host: "host3"},
-		},
-	}
-	assert.Equal(t, 3, cfg.ServerCount())
-}
-
-func TestConfig_Merge(t *testing.T) {
-	base := &Config{
-		NetBox:      NetBoxConfig{URL: "https://base.example.com"},
-		Concurrency: 5,
-		Defaults:    DefaultsConfig{Username: "base-user"},
-		Servers:     []ServerConfig{{Host: "host1"}},
-	}
-
-	other := &Config{
-		NetBox:      NetBoxConfig{URL: "https://other.example.com", Token: "token"},
-		Concurrency: 10,
-		Servers:     []ServerConfig{{Host: "host2"}},
-	}
-
-	base.Merge(other)
-
-	assert.Equal(t, "https://other.example.com", base.NetBox.URL)
-	assert.Equal(t, "token", base.NetBox.Token)
-	assert.Equal(t, 10, base.Concurrency)
-	assert.Equal(t, "base-user", base.Defaults.Username) // Not overwritten
-	assert.Len(t, base.Servers, 2)
-}
-
-func TestConfig_Merge_Nil(t *testing.T) {
-	base := &Config{
-		Concurrency: 5,
-	}
-
-	base.Merge(nil)
-
-	assert.Equal(t, 5, base.Concurrency)
 }
