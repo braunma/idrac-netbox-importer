@@ -30,6 +30,7 @@ build-and-test:
   artifacts:
     paths:
       - idrac-inventory
+      - config.yaml
     expire_in: 1 day
 
 # =============================================================================
@@ -74,33 +75,21 @@ docker-release:
 
 run-scanner:
   stage: scan
-  image: docker:24
-  services:
-    - docker:24-dind
+  image: alpine:3.21
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - apk add --no-cache ca-certificates tzdata
   script:
     - echo "Running iDRAC inventory scanner..."
-    - docker pull $CI_REGISTRY_IMAGE:latest
-    - |
-      docker run --rm \
-        -e IDRAC_DEFAULT_USER=$IDRAC_DEFAULT_USER \
-        -e IDRAC_DEFAULT_PASS=$IDRAC_DEFAULT_PASS \
-        -e NETBOX_URL=$NETBOX_URL \
-        -e NETBOX_TOKEN=$NETBOX_TOKEN \
-        -e IDRAC_LOG_LEVEL=${IDRAC_LOG_LEVEL:-info} \
-        -e IDRAC_CONCURRENCY=${IDRAC_CONCURRENCY:-10} \
-        -v $CI_PROJECT_DIR/config.yaml:/app/config.yaml \
-        $CI_REGISTRY_IMAGE:latest \
-        -config /app/config.yaml -sync -output json > scan-results.json
+    - chmod +x ./idrac-inventory
+    - ./idrac-inventory -config config.yaml -sync -output json > scan-results.json
     - echo "✅ Scanner completed"
     - cat scan-results.json
   artifacts:
     paths:
       - scan-results.json
     expire_in: 7 days
-    reports:
-      dotenv: scan-results.json
+  dependencies:
+    - build-and-test
   only:
     - main
     - tags
