@@ -367,20 +367,11 @@ func (c *Client) buildCustomFields(info models.ServerInfo) map[string]interface{
 				break
 			}
 		}
+	}
 
-		// Calculate maximum capacity: total slots × largest module size
-		maxModuleCapacityGB := 0
-		for _, mem := range info.Memory {
-			if mem.IsPopulated() {
-				moduleCapacityGB := int(mem.CapacityGB())
-				if moduleCapacityGB > maxModuleCapacityGB {
-					maxModuleCapacityGB = moduleCapacityGB
-				}
-			}
-		}
-		if maxModuleCapacityGB > 0 && info.MemorySlotsTotal > 0 {
-			fields[c.fieldNames.RAMMaxCapacityGB] = info.MemorySlotsTotal * maxModuleCapacityGB
-		}
+	// Add maximum memory capacity if available
+	if info.MaxMemoryGiB > 0 {
+		fields[c.fieldNames.RAMMaxCapacityGB] = int(info.MaxMemoryGiB)
 	}
 
 	// Add storage information

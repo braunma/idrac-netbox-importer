@@ -58,6 +58,9 @@ type System struct {
 	MemorySummary    MemorySummary    `json:"MemorySummary"`
 	ProcessorSummary ProcessorSummary `json:"ProcessorSummary"`
 
+	// OEM extensions
+	Oem SystemOEM `json:"Oem"`
+
 	// Links to other resources
 	Processors Link `json:"Processors"`
 	Memory     Link `json:"Memory"`
@@ -71,6 +74,23 @@ type MemorySummary struct {
 	TotalSystemMemoryGiB float64 `json:"TotalSystemMemoryGiB"`
 	Status               Status  `json:"Status"`
 	MemoryMirroring      string  `json:"MemoryMirroring"`
+}
+
+// SystemOEM represents vendor-specific OEM extensions at the System level.
+type SystemOEM struct {
+	Dell *DellSystemOEM `json:"Dell,omitempty"`
+}
+
+// DellSystemOEM contains Dell-specific system OEM data.
+type DellSystemOEM struct {
+	DellSystem *DellSystemAttributes `json:"DellSystem,omitempty"`
+}
+
+// DellSystemAttributes contains Dell system attributes including memory info.
+type DellSystemAttributes struct {
+	MaxDIMMSlots   int `json:"MaxDIMMSlots,omitempty"`
+	PopulatedSlots int `json:"PopulatedSlots,omitempty"`
+	MemoryMaxGB    int `json:"SysMemMaxCapacityGB,omitempty"`
 }
 
 // ProcessorSummary provides a summary of processors in the system.

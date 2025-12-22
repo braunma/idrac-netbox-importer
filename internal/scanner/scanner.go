@@ -323,6 +323,26 @@ func (s *Scanner) collectSystemInfo(ctx context.Context, client *redfishClient, 
 	// Use memory summary for total RAM
 	info.TotalMemoryGiB = system.MemorySummary.TotalSystemMemoryGiB
 
+	// Extract Dell OEM memory information if available
+	if system.Oem.Dell != nil && system.Oem.Dell.DellSystem != nil {
+		dellSys := system.Oem.Dell.DellSystem
+		if dellSys.MaxDIMMSlots > 0 {
+			info.MemorySlotsTotal = dellSys.MaxDIMMSlots
+			s.logger.Debugw("extracted Dell OEM memory slot info",
+				"host", info.Host,
+				"max_dimm_slots", dellSys.MaxDIMMSlots,
+				"populated_slots", dellSys.PopulatedSlots,
+			)
+		}
+		if dellSys.MemoryMaxGB > 0 {
+			info.MaxMemoryGiB = float64(dellSys.MemoryMaxGB)
+			s.logger.Debugw("extracted Dell OEM max memory capacity",
+				"host", info.Host,
+				"max_memory_gb", dellSys.MemoryMaxGB,
+			)
+		}
+	}
+
 	// Log extracted system information
 	s.logger.Infow("extracted system information",
 		"host", info.Host,
@@ -482,9 +502,15 @@ func (s *Scanner) collectMemory(ctx context.Context, client *redfishClient, info
 	}
 
 	info.Memory = memoryModules
-	info.MemorySlotsTotal = len(memoryModules)
 	info.MemorySlotsUsed = slotsUsed
-	info.MemorySlotsFree = slotsFree
+
+	// Set total slots if not already set by OEM data
+	if info.MemorySlotsTotal == 0 {
+		info.MemorySlotsTotal = len(memoryModules)
+	}
+
+	// Calculate free slots
+	info.MemorySlotsFree = info.MemorySlotsTotal - slotsUsed
 
 	// Update total memory if we calculated it from DIMMs
 	if totalMemoryMiB > 0 {
@@ -495,10 +521,29 @@ func (s *Scanner) collectMemory(ctx context.Context, client *redfishClient, info
 		}
 	}
 
+	// Calculate maximum memory capacity if not already set by OEM
+	if info.MaxMemoryGiB == 0 && info.MemorySlotsTotal > 0 && len(memoryModules) > 0 {
+		// Find the largest installed DIMM capacity
+		var maxModuleGiB float64
+		for _, mem := range memoryModules {
+			if mem.IsPopulated() {
+				moduleGiB := mem.CapacityGB()
+				if moduleGiB > maxModuleGiB {
+					maxModuleGiB = moduleGiB
+				}
+			}
+		}
+		// Maximum capacity = total slots × largest module size
+		if maxModuleGiB > 0 {
+			info.MaxMemoryGiB = float64(info.MemorySlotsTotal) * maxModuleGiB
+		}
+	}
+
 	// Log extracted memory information
 	s.logger.Infow("extracted memory information",
 		"host", info.Host,
 		"total_memory_gib", info.TotalMemoryGiB,
+		"max_memory_gib", info.MaxMemoryGiB,
 		"slots_total", info.MemorySlotsTotal,
 		"slots_used", info.MemorySlotsUsed,
 		"slots_free", info.MemorySlotsFree,
