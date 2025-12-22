@@ -96,7 +96,12 @@ func (f *ConsoleFormatter) formatServer(w io.Writer, info models.ServerInfo) {
 	}
 
 	// Memory
-	fmt.Fprintf(w, "\n%s Memory: %.0f GiB total\n", f.icon("💾"), info.TotalMemoryGiB)
+	if info.MaxMemoryGiB > 0 {
+		fmt.Fprintf(w, "\n%s Memory: %.0f GiB / %.0f GiB max\n",
+			f.icon("💾"), info.TotalMemoryGiB, info.MaxMemoryGiB)
+	} else {
+		fmt.Fprintf(w, "\n%s Memory: %.0f GiB total\n", f.icon("💾"), info.TotalMemoryGiB)
+	}
 	fmt.Fprintf(w, "   └─ Slots: %d/%d used (%d free)\n",
 		info.MemorySlotsUsed, info.MemorySlotsTotal, info.MemorySlotsFree)
 
@@ -285,7 +290,7 @@ func NewCSVFormatter() *CSVFormatter {
 // Format outputs results as CSV.
 func (f *CSVFormatter) Format(w io.Writer, results []models.ServerInfo, stats models.CollectionStats) error {
 	// Header
-	fmt.Fprintln(w, "host,model,manufacturer,service_tag,serial,bios_version,power_state,cpu_count,cpu_model,ram_total_gb,ram_slots_total,ram_slots_used,ram_slots_free,drive_count,storage_total_tb,status,error")
+	fmt.Fprintln(w, "host,model,manufacturer,service_tag,serial,bios_version,power_state,cpu_count,cpu_model,ram_total_gb,ram_max_gb,ram_slots_total,ram_slots_used,ram_slots_free,drive_count,storage_total_tb,status,error")
 
 	for _, info := range results {
 		status := "OK"
@@ -295,7 +300,7 @@ func (f *CSVFormatter) Format(w io.Writer, results []models.ServerInfo, stats mo
 			errorMsg = info.Error.Error()
 		}
 
-		fmt.Fprintf(w, "%s,%s,%s,%s,%s,%s,%s,%d,%s,%.0f,%d,%d,%d,%d,%.2f,%s,%s\n",
+		fmt.Fprintf(w, "%s,%s,%s,%s,%s,%s,%s,%d,%s,%.0f,%.0f,%d,%d,%d,%d,%.2f,%s,%s\n",
 			csvEscape(info.Host),
 			csvEscape(info.Model),
 			csvEscape(info.Manufacturer),
@@ -306,6 +311,7 @@ func (f *CSVFormatter) Format(w io.Writer, results []models.ServerInfo, stats mo
 			info.CPUCount,
 			csvEscape(info.CPUModel),
 			info.TotalMemoryGiB,
+			info.MaxMemoryGiB,
 			info.MemorySlotsTotal,
 			info.MemorySlotsUsed,
 			info.MemorySlotsFree,
