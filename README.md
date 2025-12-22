@@ -315,12 +315,13 @@ Create these custom fields on the Device model in NetBox:
 | `hw_ram_slots_available` | Integer | Available memory slots |
 | `hw_memory_type` | Text | Memory type (e.g., DDR4, DDR5) |
 | `hw_memory_speed_mhz` | Integer | Memory speed in MHz |
-| `hw_memory_max_capacity_gb` | Integer | Maximum memory capacity (slots × largest module) |
 | `hw_disk_count` | Integer | Number of drives |
 | `hw_storage_summary` | Text | Storage grouped by capacity (e.g., "2x745GB, 16x14306GB") |
 | `hw_storage_total_tb` | Text | Total storage in TB |
 | `hw_bios_version` | Text | BIOS version |
 | `hw_power_state` | Text | Power state (On/Off) |
+| `hw_power_consumed_watts` | Integer | Current power consumption in watts |
+| `hw_power_peak_watts` | Integer | Historical peak power consumption in watts |
 | `hw_last_inventory` | Text | Last inventory timestamp |
 
 ### Custom Field Name Configuration
@@ -496,12 +497,13 @@ CSV export for spreadsheet analysis:
 | `NETBOX_FIELD_RAM_SLOTS_AVAILABLE` | RAM slots available field name | `hw_ram_slots_available` |
 | `NETBOX_FIELD_RAM_TYPE` | Memory type field name | `hw_memory_type` |
 | `NETBOX_FIELD_RAM_SPEED` | Memory speed field name | `hw_memory_speed_mhz` |
-| `NETBOX_FIELD_RAM_MAX_CAPACITY` | Max memory capacity field name | `hw_memory_max_capacity_gb` |
 | `NETBOX_FIELD_DISK_COUNT` | Disk count field name | `hw_disk_count` |
 | `NETBOX_FIELD_STORAGE_SUMMARY` | Storage summary field name | `hw_storage_summary` |
 | `NETBOX_FIELD_STORAGE_TOTAL` | Total storage field name | `hw_storage_total_tb` |
 | `NETBOX_FIELD_BIOS_VERSION` | BIOS version field name | `hw_bios_version` |
 | `NETBOX_FIELD_POWER_STATE` | Power state field name | `hw_power_state` |
+| `NETBOX_FIELD_POWER_CONSUMED_WATTS` | Current power consumption field name | `hw_power_consumed_watts` |
+| `NETBOX_FIELD_POWER_PEAK_WATTS` | Peak power consumption field name | `hw_power_peak_watts` |
 | `NETBOX_FIELD_LAST_INVENTORY` | Last inventory field name | `hw_last_inventory` |
 
 ### Retry Configuration

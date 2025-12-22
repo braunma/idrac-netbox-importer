@@ -35,17 +35,20 @@ type ServerInfo struct {
 	CPUModel string    `json:"cpu_model"`
 
 	// Memory information
-	Memory            []MemoryInfo `json:"memory"`
-	TotalMemoryGiB    float64      `json:"total_memory_gib"`
-	MaxMemoryGiB      float64      `json:"max_memory_gib"`
-	MemorySlotsTotal  int          `json:"memory_slots_total"`
-	MemorySlotsUsed   int          `json:"memory_slots_used"`
-	MemorySlotsFree   int          `json:"memory_slots_free"`
+	Memory           []MemoryInfo `json:"memory"`
+	TotalMemoryGiB   float64      `json:"total_memory_gib"`
+	MemorySlotsTotal int          `json:"memory_slots_total"`
+	MemorySlotsUsed  int          `json:"memory_slots_used"`
+	MemorySlotsFree  int          `json:"memory_slots_free"`
 
 	// Storage information
 	Drives         []DriveInfo `json:"drives"`
 	DriveCount     int         `json:"drive_count"`
 	TotalStorageTB float64     `json:"total_storage_tb"`
+
+	// Power information
+	PowerConsumedWatts int `json:"power_consumed_watts,omitempty"`
+	PowerPeakWatts     int `json:"power_peak_watts,omitempty"`
 }
 
 // IsValid returns true if the server info was collected without errors.
