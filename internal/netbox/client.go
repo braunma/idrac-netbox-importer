@@ -45,8 +45,6 @@ type FieldNames struct {
 	StorageTotalTB      string
 	BIOSVersion         string
 	PowerState          string
-	PowerConsumedWatts  string
-	PowerPeakWatts      string
 	LastInventory       string
 }
 
@@ -67,8 +65,6 @@ func DefaultFieldNames() FieldNames {
 		StorageTotalTB:     defaults.NetBoxFieldStorageTotalTB,
 		BIOSVersion:        defaults.NetBoxFieldBIOSVersion,
 		PowerState:         defaults.NetBoxFieldPowerState,
-		PowerConsumedWatts: defaults.NetBoxFieldPowerConsumedWatts,
-		PowerPeakWatts:     defaults.NetBoxFieldPowerPeakWatts,
 		LastInventory:      defaults.NetBoxFieldLastInventory,
 	}
 }
@@ -375,14 +371,6 @@ func (c *Client) buildCustomFields(info models.ServerInfo) map[string]interface{
 	fields[c.fieldNames.DiskCount] = info.DriveCount
 	if len(info.Drives) > 0 {
 		fields[c.fieldNames.StorageSummary] = c.buildStorageSummary(info.Drives)
-	}
-
-	// Add power consumption data if available
-	if info.PowerConsumedWatts > 0 {
-		fields[c.fieldNames.PowerConsumedWatts] = info.PowerConsumedWatts
-	}
-	if info.PowerPeakWatts > 0 {
-		fields[c.fieldNames.PowerPeakWatts] = info.PowerPeakWatts
 	}
 
 	return fields

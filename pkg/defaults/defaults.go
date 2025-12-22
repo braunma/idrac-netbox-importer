@@ -76,7 +76,6 @@ var (
 	RedfishProcessorsPath = getEnvOrDefault("REDFISH_PROCESSORS_PATH", "/redfish/v1/Systems/System.Embedded.1/Processors")
 	RedfishMemoryPath     = getEnvOrDefault("REDFISH_MEMORY_PATH", "/redfish/v1/Systems/System.Embedded.1/Memory")
 	RedfishStoragePath    = getEnvOrDefault("REDFISH_STORAGE_PATH", "/redfish/v1/Systems/System.Embedded.1/Storage")
-	RedfishPowerPath      = getEnvOrDefault("REDFISH_POWER_PATH", "/redfish/v1/Chassis/System.Embedded.1/Power")
 )
 
 // NetBox API paths
@@ -101,8 +100,6 @@ var (
 	NetBoxFieldStorageTotalTB    = getEnvOrDefault("NETBOX_FIELD_STORAGE_TOTAL", "hw_storage_total_tb")
 	NetBoxFieldBIOSVersion          = getEnvOrDefault("NETBOX_FIELD_BIOS_VERSION", "hw_bios_version")
 	NetBoxFieldPowerState           = getEnvOrDefault("NETBOX_FIELD_POWER_STATE", "hw_power_state")
-	NetBoxFieldPowerConsumedWatts   = getEnvOrDefault("NETBOX_FIELD_POWER_CONSUMED_WATTS", "hw_power_consumed_watts")
-	NetBoxFieldPowerPeakWatts       = getEnvOrDefault("NETBOX_FIELD_POWER_PEAK_WATTS", "hw_power_peak_watts")
 	NetBoxFieldLastInventory        = getEnvOrDefault("NETBOX_FIELD_LAST_INVENTORY", "hw_last_inventory")
 )
 

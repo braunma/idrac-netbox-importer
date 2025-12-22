@@ -45,10 +45,6 @@ type ServerInfo struct {
 	Drives         []DriveInfo `json:"drives"`
 	DriveCount     int         `json:"drive_count"`
 	TotalStorageTB float64     `json:"total_storage_tb"`
-
-	// Power information
-	PowerConsumedWatts int `json:"power_consumed_watts,omitempty"`
-	PowerPeakWatts     int `json:"power_peak_watts,omitempty"`
 }
 
 // IsValid returns true if the server info was collected without errors.

@@ -408,27 +408,6 @@ func createMockiDRACWithDelay(t *testing.T, delay time.Duration) *httptest.Serve
 				Status:        redfish.Status{State: "Enabled", Health: "OK"},
 			})
 
-		case "/redfish/v1/Chassis/System.Embedded.1/Power":
-			json.NewEncoder(w).Encode(redfish.Power{
-				OdataID:   "/redfish/v1/Chassis/System.Embedded.1/Power",
-				OdataType: "#Power.v1_7_1.Power",
-				ID:        "Power",
-				Name:      "Power",
-				PowerControl: []redfish.PowerControl{
-					{
-						MemberID:           "0",
-						Name:               "System Power Control",
-						PowerConsumedWatts: 420,
-						PowerMetrics: redfish.PowerMetrics{
-							MinConsumedWatts:     380,
-							MaxConsumedWatts:     580,
-							AverageConsumedWatts: 450,
-							IntervalInMin:        60,
-						},
-					},
-				},
-			})
-
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}

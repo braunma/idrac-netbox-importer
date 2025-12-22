@@ -326,32 +326,3 @@ type ServiceRoot struct {
 	Product        string `json:"Product"`
 	Vendor         string `json:"Vendor"`
 }
-
-// Power represents a Redfish Power resource containing power consumption data.
-type Power struct {
-	OdataID      string         `json:"@odata.id"`
-	OdataType    string         `json:"@odata.type"`
-	ID           string         `json:"Id"`
-	Name         string         `json:"Name"`
-	PowerControl []PowerControl `json:"PowerControl"`
-}
-
-// PowerControl represents power control and consumption information.
-type PowerControl struct {
-	MemberID             string       `json:"MemberId"`
-	Name                 string       `json:"Name"`
-	PowerConsumedWatts   int          `json:"PowerConsumedWatts,omitempty"`
-	PowerMetrics         PowerMetrics `json:"PowerMetrics,omitempty"`
-	PowerCapacityWatts   int          `json:"PowerCapacityWatts,omitempty"`
-	PowerAllocatedWatts  int          `json:"PowerAllocatedWatts,omitempty"`
-	PowerAvailableWatts  int          `json:"PowerAvailableWatts,omitempty"`
-	PowerRequestedWatts  int          `json:"PowerRequestedWatts,omitempty"`
-}
-
-// PowerMetrics contains historical power consumption statistics.
-type PowerMetrics struct {
-	MinConsumedWatts     int `json:"MinConsumedWatts,omitempty"`
-	MaxConsumedWatts     int `json:"MaxConsumedWatts,omitempty"`
-	AverageConsumedWatts int `json:"AverageConsumedWatts,omitempty"`
-	IntervalInMin        int `json:"IntervalInMin,omitempty"`
-}

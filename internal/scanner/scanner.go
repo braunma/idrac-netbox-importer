@@ -255,15 +255,6 @@ func (s *Scanner) scanServer(ctx context.Context, server config.ServerConfig) mo
 		// Don't fail the whole scan
 	}
 
-	// Collect power information
-	if err := s.collectPowerInfo(scanCtx, client, &info); err != nil {
-		s.logger.Debugw("failed to collect power info",
-			"host", server.Host,
-			"error", err,
-		)
-		// Don't fail the whole scan - power data is optional
-	}
-
 	s.logger.Infow("server scan completed",
 		"host", server.Host,
 		"model", info.Model,
@@ -631,40 +622,6 @@ func (s *Scanner) collectStorage(ctx context.Context, client *redfishClient, inf
 			"media_type", drive.MediaType,
 			"protocol", drive.Protocol,
 			"health", drive.Health,
-		)
-	}
-
-	return nil
-}
-
-// collectPowerInfo retrieves power consumption information from the chassis.
-// This function is resilient - it will not fail if power data is unavailable.
-func (s *Scanner) collectPowerInfo(ctx context.Context, client *redfishClient, info *models.ServerInfo) error {
-	var power redfish.Power
-	if err := client.get(ctx, defaults.RedfishPowerPath, &power); err != nil {
-		// Power data may not be available on all systems
-		return errors.NewCollectionError(info.Host, "power", err)
-	}
-
-	// Extract power consumption data from the first PowerControl entry
-	if len(power.PowerControl) > 0 {
-		pc := power.PowerControl[0]
-
-		// Set current power consumption if available
-		if pc.PowerConsumedWatts > 0 {
-			info.PowerConsumedWatts = pc.PowerConsumedWatts
-		}
-
-		// Set peak power consumption from metrics if available
-		if pc.PowerMetrics.MaxConsumedWatts > 0 {
-			info.PowerPeakWatts = pc.PowerMetrics.MaxConsumedWatts
-		}
-
-		s.logger.Infow("extracted power information",
-			"host", info.Host,
-			"power_consumed_watts", info.PowerConsumedWatts,
-			"power_peak_watts", info.PowerPeakWatts,
-			"metrics_interval_min", pc.PowerMetrics.IntervalInMin,
 		)
 	}
 
