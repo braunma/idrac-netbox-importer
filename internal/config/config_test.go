@@ -14,7 +14,38 @@ func init() {
 	_ = logging.Init(logging.Config{Level: "error", Format: "console"})
 }
 
+// clearTestEnv clears all environment variables that might affect config parsing
+func clearTestEnv(t *testing.T) {
+	t.Helper()
+	envVars := []string{
+		"NETBOX_URL",
+		"NETBOX_TOKEN",
+		"IDRAC_DEFAULT_USER",
+		"IDRAC_DEFAULT_PASS",
+		"IDRAC_LOG_LEVEL",
+		"IDRAC_LOG_FORMAT",
+		"IDRAC_DEFAULT_TIMEOUT",
+		"IDRAC_CONCURRENCY",
+		"IDRAC_INSECURE_SKIP_VERIFY",
+		"NETBOX_TIMEOUT",
+		"NETBOX_INSECURE_SKIP_VERIFY",
+	}
+
+	for _, env := range envVars {
+		os.Unsetenv(env)
+	}
+
+	// Cleanup after test
+	t.Cleanup(func() {
+		for _, env := range envVars {
+			os.Unsetenv(env)
+		}
+	})
+}
+
 func TestParse_ValidConfig(t *testing.T) {
+	clearTestEnv(t) // Clear environment variables that might interfere
+
 	yaml := `
 netbox:
   url: "https://netbox.example.com"
@@ -84,6 +115,8 @@ servers: []
 }
 
 func TestParse_MissingCredentials(t *testing.T) {
+	clearTestEnv(t) // Clear environment variables that might interfere
+
 	yaml := `
 servers:
   - host: "192.168.1.10"
@@ -110,6 +143,8 @@ servers:
 }
 
 func TestParse_InvalidNetBoxConfig(t *testing.T) {
+	clearTestEnv(t) // Clear environment variables that might interfere
+
 	yaml := `
 netbox:
   url: "https://netbox.example.com"
@@ -128,6 +163,8 @@ servers:
 }
 
 func TestParse_InvalidLogLevel(t *testing.T) {
+	clearTestEnv(t) // Clear environment variables that might interfere
+
 	yaml := `
 defaults:
   username: "root"
@@ -145,6 +182,8 @@ servers:
 }
 
 func TestParse_InvalidLogFormat(t *testing.T) {
+	clearTestEnv(t) // Clear environment variables that might interfere
+
 	yaml := `
 defaults:
   username: "root"
