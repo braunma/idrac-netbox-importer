@@ -31,39 +31,43 @@ type Client struct {
 
 // FieldNames holds the configurable NetBox custom field names.
 type FieldNames struct {
-	CPUCount       string
-	CPUModel       string
-	CPUCores       string
-	CPUThreads     string
-	CPUSpeedMHz    string
-	RAMTotalGB     string
-	RAMSlotsTotal  string
-	RAMSlotsUsed   string
-	RAMSlotsFree   string
-	DiskCount      string
-	StorageTotalTB string
-	BIOSVersion    string
-	PowerState     string
-	LastInventory  string
+	CPUCount          string
+	CPUModel          string
+	CPUCores          string
+	RAMTotalGB        string
+	RAMSlotsTotal     string
+	RAMSlotsUsed      string
+	RAMSlotsAvailable string
+	RAMType           string
+	RAMSpeedMHz       string
+	RAMMaxCapacityGB  string
+	DiskCount         string
+	StorageSummary    string
+	StorageTotalTB    string
+	BIOSVersion       string
+	PowerState        string
+	LastInventory     string
 }
 
 // DefaultFieldNames returns the default field names from the defaults package.
 func DefaultFieldNames() FieldNames {
 	return FieldNames{
-		CPUCount:       defaults.NetBoxFieldCPUCount,
-		CPUModel:       defaults.NetBoxFieldCPUModel,
-		CPUCores:       defaults.NetBoxFieldCPUCores,
-		CPUThreads:     defaults.NetBoxFieldCPUThreads,
-		CPUSpeedMHz:    defaults.NetBoxFieldCPUSpeedMHz,
-		RAMTotalGB:     defaults.NetBoxFieldRAMTotalGB,
-		RAMSlotsTotal:  defaults.NetBoxFieldRAMSlotsTotal,
-		RAMSlotsUsed:   defaults.NetBoxFieldRAMSlotsUsed,
-		RAMSlotsFree:   defaults.NetBoxFieldRAMSlotsFree,
-		DiskCount:      defaults.NetBoxFieldDiskCount,
-		StorageTotalTB: defaults.NetBoxFieldStorageTotalTB,
-		BIOSVersion:    defaults.NetBoxFieldBIOSVersion,
-		PowerState:     defaults.NetBoxFieldPowerState,
-		LastInventory:  defaults.NetBoxFieldLastInventory,
+		CPUCount:         defaults.NetBoxFieldCPUCount,
+		CPUModel:         defaults.NetBoxFieldCPUModel,
+		CPUCores:         defaults.NetBoxFieldCPUCores,
+		RAMTotalGB:        defaults.NetBoxFieldRAMTotalGB,
+		RAMSlotsTotal:     defaults.NetBoxFieldRAMSlotsTotal,
+		RAMSlotsUsed:      defaults.NetBoxFieldRAMSlotsUsed,
+		RAMSlotsAvailable: defaults.NetBoxFieldRAMSlotsAvailable,
+		RAMType:           defaults.NetBoxFieldRAMType,
+		RAMSpeedMHz:      defaults.NetBoxFieldRAMSpeedMHz,
+		RAMMaxCapacityGB: defaults.NetBoxFieldRAMMaxCapacityGB,
+		DiskCount:        defaults.NetBoxFieldDiskCount,
+		StorageSummary:   defaults.NetBoxFieldStorageSummary,
+		StorageTotalTB:   defaults.NetBoxFieldStorageTotalTB,
+		BIOSVersion:      defaults.NetBoxFieldBIOSVersion,
+		PowerState:       defaults.NetBoxFieldPowerState,
+		LastInventory:    defaults.NetBoxFieldLastInventory,
 	}
 }
 
@@ -336,27 +340,100 @@ func (c *Client) SyncServerInfo(ctx context.Context, info models.ServerInfo) err
 // Uses configurable field names from the defaults package.
 func (c *Client) buildCustomFields(info models.ServerInfo) map[string]interface{} {
 	fields := map[string]interface{}{
-		c.fieldNames.CPUCount:       info.CPUCount,
-		c.fieldNames.CPUModel:       info.CPUModel,
-		c.fieldNames.RAMTotalGB:     int(info.TotalMemoryGiB),
-		c.fieldNames.RAMSlotsTotal:  info.MemorySlotsTotal,
-		c.fieldNames.RAMSlotsUsed:   info.MemorySlotsUsed,
-		c.fieldNames.RAMSlotsFree:   info.MemorySlotsFree,
-		c.fieldNames.DiskCount:      info.DriveCount,
-		c.fieldNames.StorageTotalTB: fmt.Sprintf("%.2f", info.TotalStorageTB),
+		c.fieldNames.CPUCount:         info.CPUCount,
+		c.fieldNames.CPUModel:         info.CPUModel,
+		c.fieldNames.RAMTotalGB:       int(info.TotalMemoryGiB),
+		c.fieldNames.RAMSlotsTotal:    info.MemorySlotsTotal,
+		c.fieldNames.RAMSlotsUsed:     info.MemorySlotsUsed,
+		c.fieldNames.RAMSlotsAvailable: info.MemorySlotsFree,
+		c.fieldNames.StorageTotalTB:   fmt.Sprintf("%.2f", info.TotalStorageTB),
 		c.fieldNames.BIOSVersion:    info.BiosVersion,
 		c.fieldNames.PowerState:     info.PowerState,
 		c.fieldNames.LastInventory:  info.CollectedAt.Format(time.RFC3339),
 	}
 
-	// Add CPU details if available
+	// Add CPU cores if available
 	if len(info.CPUs) > 0 {
 		fields[c.fieldNames.CPUCores] = info.CPUs[0].Cores
-		fields[c.fieldNames.CPUThreads] = info.CPUs[0].Threads
-		fields[c.fieldNames.CPUSpeedMHz] = info.CPUs[0].MaxSpeedMHz
+	}
+
+	// Add memory details if available
+	if len(info.Memory) > 0 {
+		// Get memory type and speed from first populated module
+		for _, mem := range info.Memory {
+			if mem.IsPopulated() {
+				fields[c.fieldNames.RAMType] = mem.Type
+				fields[c.fieldNames.RAMSpeedMHz] = mem.SpeedMHz
+				break
+			}
+		}
+
+		// Calculate maximum capacity: total slots × largest module size
+		maxModuleCapacityGB := 0
+		for _, mem := range info.Memory {
+			if mem.IsPopulated() {
+				moduleCapacityGB := int(mem.CapacityGB())
+				if moduleCapacityGB > maxModuleCapacityGB {
+					maxModuleCapacityGB = moduleCapacityGB
+				}
+			}
+		}
+		if maxModuleCapacityGB > 0 && info.MemorySlotsTotal > 0 {
+			fields[c.fieldNames.RAMMaxCapacityGB] = info.MemorySlotsTotal * maxModuleCapacityGB
+		}
+	}
+
+	// Add storage information
+	fields[c.fieldNames.DiskCount] = info.DriveCount
+	if len(info.Drives) > 0 {
+		fields[c.fieldNames.StorageSummary] = c.buildStorageSummary(info.Drives)
 	}
 
 	return fields
+}
+
+// buildStorageSummary creates a grouped summary of drives by capacity.
+// Example output: "2x745GB, 16x14306GB"
+func (c *Client) buildStorageSummary(drives []models.DriveInfo) string {
+	// Group drives by capacity (rounded to nearest GB)
+	capacityGroups := make(map[int]int)
+	for _, drive := range drives {
+		capacityGB := int(drive.CapacityGB)
+		capacityGroups[capacityGB]++
+	}
+
+	// Build summary string
+	var summary []string
+	// Sort capacities for consistent output
+	var capacities []int
+	for capacity := range capacityGroups {
+		capacities = append(capacities, capacity)
+	}
+
+	// Simple sorting (bubble sort is fine for small arrays)
+	for i := 0; i < len(capacities)-1; i++ {
+		for j := i + 1; j < len(capacities); j++ {
+			if capacities[i] > capacities[j] {
+				capacities[i], capacities[j] = capacities[j], capacities[i]
+			}
+		}
+	}
+
+	for _, capacity := range capacities {
+		count := capacityGroups[capacity]
+		summary = append(summary, fmt.Sprintf("%dx%dGB", count, capacity))
+	}
+
+	// Join all groups with comma separator
+	result := ""
+	for i, s := range summary {
+		if i > 0 {
+			result += ", "
+		}
+		result += s
+	}
+
+	return result
 }
 
 // findDevice searches for a device in NetBox using service tag and serial number.
