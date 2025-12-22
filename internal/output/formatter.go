@@ -148,6 +148,17 @@ func (f *ConsoleFormatter) formatServer(w io.Writer, info models.ServerInfo) {
 			fmt.Fprintf(w, "   └─ %d× HDD (%.0f GB total)\n", hddCount, hddCapacity)
 		}
 	}
+
+	// Power Consumption
+	if info.PowerConsumedWatts > 0 || info.PowerPeakWatts > 0 {
+		fmt.Fprintf(w, "\n%s Power Consumption:\n", f.icon("⚡"))
+		if info.PowerConsumedWatts > 0 {
+			fmt.Fprintf(w, "   └─ Current: %d W\n", info.PowerConsumedWatts)
+		}
+		if info.PowerPeakWatts > 0 {
+			fmt.Fprintf(w, "   └─ Peak:    %d W\n", info.PowerPeakWatts)
+		}
+	}
 }
 
 func (f *ConsoleFormatter) formatSummary(w io.Writer, stats models.CollectionStats) {
@@ -241,8 +252,8 @@ func (f *TableFormatter) Format(w io.Writer, results []models.ServerInfo, stats 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 
 	// Header
-	fmt.Fprintln(tw, "HOST\tMODEL\tSERVICE TAG\tCPUs\tRAM (GB)\tRAM SLOTS\tDRIVES\tSTATUS")
-	fmt.Fprintln(tw, "----\t-----\t-----------\t----\t--------\t---------\t------\t------")
+	fmt.Fprintln(tw, "HOST\tMODEL\tSERVICE TAG\tCPUs\tRAM (GB)\tRAM SLOTS\tDRIVES\tPOWER (W)\tSTATUS")
+	fmt.Fprintln(tw, "----\t-----\t-----------\t----\t--------\t---------\t------\t---------\t------")
 
 	for _, info := range results {
 		status := "OK"
@@ -251,8 +262,14 @@ func (f *TableFormatter) Format(w io.Writer, results []models.ServerInfo, stats 
 		}
 
 		ramSlots := fmt.Sprintf("%d/%d", info.MemorySlotsUsed, info.MemorySlotsTotal)
+		power := ""
+		if info.PowerConsumedWatts > 0 {
+			power = fmt.Sprintf("%d", info.PowerConsumedWatts)
+		} else {
+			power = "-"
+		}
 
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%.0f\t%s\t%d\t%s\n",
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%.0f\t%s\t%d\t%s\t%s\n",
 			info.Host,
 			info.Model,
 			info.ServiceTag,
@@ -260,6 +277,7 @@ func (f *TableFormatter) Format(w io.Writer, results []models.ServerInfo, stats 
 			info.TotalMemoryGiB,
 			ramSlots,
 			info.DriveCount,
+			power,
 			status,
 		)
 	}
