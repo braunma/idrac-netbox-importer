@@ -28,6 +28,7 @@ const (
 	EnvNetBoxToken              = "NETBOX_TOKEN"
 	EnvNetBoxTimeout            = "NETBOX_TIMEOUT"
 	EnvNetBoxInsecureSkipVerify = "NETBOX_INSECURE_SKIP_VERIFY"
+	EnvNetBoxCACert             = "CA_Chain"
 
 	// HTTP Client
 	EnvHTTPMaxIdleConns    = "HTTP_MAX_IDLE_CONNS"

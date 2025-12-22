@@ -18,6 +18,7 @@
 # NETBOX_TOKEN             - NetBox API token
 # NETBOX_TIMEOUT           - NetBox API timeout (seconds)
 # NETBOX_INSECURE_SKIP_VERIFY - Skip TLS verification for NetBox
+# CA_Chain                 - Custom CA certificate for NetBox (PEM format)
 #
 # NetBox Custom Field Names (override if your NetBox uses different names):
 # NETBOX_FIELD_CPU_COUNT, NETBOX_FIELD_CPU_MODEL, NETBOX_FIELD_CPU_CORES,
@@ -43,7 +44,11 @@ netbox:
   
   # Skip TLS certificate verification - Override: NETBOX_INSECURE_SKIP_VERIFY
   insecure_skip_verify: false
-  
+
+  # Custom CA certificate (PEM format) - Override: CA_Chain
+  # Use this if your NetBox instance uses a self-signed certificate
+  # ca_cert: "${CA_Chain}"
+
   # API timeout in seconds - Override: NETBOX_TIMEOUT
   timeout_seconds: 30
 
