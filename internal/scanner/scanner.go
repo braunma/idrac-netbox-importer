@@ -258,6 +258,8 @@ func (s *Scanner) scanServer(ctx context.Context, server config.ServerConfig) mo
 	s.logger.Infow("server scan completed",
 		"host", server.Host,
 		"model", info.Model,
+		"serial_number", info.SerialNumber,
+		"service_tag", info.ServiceTag,
 		"cpus", info.CPUCount,
 		"ram_gb", info.TotalMemoryGiB,
 		"drives", info.DriveCount,
@@ -321,6 +323,18 @@ func (s *Scanner) collectSystemInfo(ctx context.Context, client *redfishClient, 
 	// Use memory summary for total RAM
 	info.TotalMemoryGiB = system.MemorySummary.TotalSystemMemoryGiB
 
+	// Log extracted system information
+	s.logger.Infow("extracted system information",
+		"host", info.Host,
+		"manufacturer", info.Manufacturer,
+		"model", info.Model,
+		"serial_number", info.SerialNumber,
+		"service_tag", info.ServiceTag,
+		"bios_version", info.BiosVersion,
+		"hostname", info.HostName,
+		"power_state", info.PowerState,
+	)
+
 	return nil
 }
 
@@ -350,14 +364,24 @@ func (s *Scanner) collectProcessors(ctx context.Context, client *redfishClient, 
 			continue
 		}
 
+		// Derive CPU brand from manufacturer and model
+		brand := processor.Model
+		if processor.Manufacturer != "" && processor.Model != "" {
+			brand = processor.Manufacturer + " " + processor.Model
+		}
+
 		cpu := models.CPUInfo{
 			Socket:            processor.Socket,
 			Model:             processor.Model,
 			Manufacturer:      processor.Manufacturer,
+			Brand:             brand,
 			Cores:             processor.TotalCores,
 			Threads:           processor.TotalThreads,
 			MaxSpeedMHz:       processor.MaxSpeedMHz,
 			OperatingSpeedMHz: processor.OperatingSpeedMHz,
+			ProcessorType:     processor.ProcessorType,
+			Architecture:      processor.ProcessorArchitecture,
+			InstructionSet:    processor.InstructionSet,
 			Health:            processor.Status.Health,
 		}
 
@@ -372,6 +396,27 @@ func (s *Scanner) collectProcessors(ctx context.Context, client *redfishClient, 
 		// Use first CPU's model if more detailed than summary
 		if info.CPUModel == "" && cpus[0].Model != "" {
 			info.CPUModel = cpus[0].Model
+		}
+
+		// Log extracted CPU information
+		s.logger.Infow("extracted CPU information",
+			"host", info.Host,
+			"cpu_count", len(cpus),
+		)
+		for i, cpu := range cpus {
+			s.logger.Infow("CPU details",
+				"host", info.Host,
+				"cpu_index", i+1,
+				"socket", cpu.Socket,
+				"brand", cpu.Brand,
+				"manufacturer", cpu.Manufacturer,
+				"model", cpu.Model,
+				"cores", cpu.Cores,
+				"threads", cpu.Threads,
+				"max_speed_mhz", cpu.MaxSpeedMHz,
+				"architecture", cpu.Architecture,
+				"instruction_set", cpu.InstructionSet,
+			)
 		}
 	}
 
@@ -410,15 +455,19 @@ func (s *Scanner) collectMemory(ctx context.Context, client *redfishClient, info
 		}
 
 		mem := models.MemoryInfo{
-			Slot:         slotName,
-			CapacityMiB:  memory.CapacityMiB,
-			Type:         memory.MemoryDeviceType,
-			SpeedMHz:     memory.OperatingSpeedMhz,
-			Manufacturer: memory.Manufacturer,
-			PartNumber:   memory.PartNumber,
-			SerialNumber: memory.SerialNumber,
-			State:        memory.Status.State,
-			Health:       memory.Status.Health,
+			Slot:           slotName,
+			CapacityMiB:    memory.CapacityMiB,
+			Type:           memory.MemoryDeviceType,
+			Technology:     memory.MemoryType,
+			BaseModuleType: memory.BaseModuleType,
+			SpeedMHz:       memory.OperatingSpeedMhz,
+			Manufacturer:   memory.Manufacturer,
+			PartNumber:     memory.PartNumber,
+			SerialNumber:   memory.SerialNumber,
+			RankCount:      memory.RankCount,
+			DataWidthBits:  memory.DataWidthBits,
+			State:          memory.Status.State,
+			Health:         memory.Status.Health,
 		}
 
 		memoryModules = append(memoryModules, mem)
@@ -443,6 +492,31 @@ func (s *Scanner) collectMemory(ctx context.Context, client *redfishClient, info
 		// Use calculated value if summary was missing or different
 		if info.TotalMemoryGiB == 0 || calculatedGiB > info.TotalMemoryGiB {
 			info.TotalMemoryGiB = calculatedGiB
+		}
+	}
+
+	// Log extracted memory information
+	s.logger.Infow("extracted memory information",
+		"host", info.Host,
+		"total_memory_gib", info.TotalMemoryGiB,
+		"slots_total", info.MemorySlotsTotal,
+		"slots_used", info.MemorySlotsUsed,
+		"slots_free", info.MemorySlotsFree,
+	)
+	for i, mem := range memoryModules {
+		if mem.IsPopulated() {
+			s.logger.Infow("memory module details",
+				"host", info.Host,
+				"module_index", i+1,
+				"slot", mem.Slot,
+				"capacity_gib", mem.CapacityGB(),
+				"type", mem.Type,
+				"technology", mem.Technology,
+				"base_module_type", mem.BaseModuleType,
+				"speed_mhz", mem.SpeedMHz,
+				"manufacturer", mem.Manufacturer,
+				"rank_count", mem.RankCount,
+			)
 		}
 	}
 
@@ -508,6 +582,28 @@ func (s *Scanner) collectStorage(ctx context.Context, client *redfishClient, inf
 	// Calculate total storage in TB
 	if totalCapacityBytes > 0 {
 		info.TotalStorageTB = float64(totalCapacityBytes) / 1024 / 1024 / 1024 / 1024
+	}
+
+	// Log extracted storage information
+	s.logger.Infow("extracted storage information",
+		"host", info.Host,
+		"total_drives", info.DriveCount,
+		"total_storage_tb", fmt.Sprintf("%.2f", info.TotalStorageTB),
+	)
+	for i, drive := range allDrives {
+		s.logger.Infow("drive details",
+			"host", info.Host,
+			"drive_index", i+1,
+			"name", drive.Name,
+			"model", drive.Model,
+			"manufacturer", drive.Manufacturer,
+			"serial_number", drive.SerialNumber,
+			"capacity_gb", fmt.Sprintf("%.2f", drive.CapacityGB),
+			"capacity_tb", fmt.Sprintf("%.2f", drive.CapacityTB()),
+			"media_type", drive.MediaType,
+			"protocol", drive.Protocol,
+			"health", drive.Health,
+		)
 	}
 
 	return nil

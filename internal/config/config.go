@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -262,6 +263,11 @@ func (c *Config) applyEnvOverrides() {
 	}
 	if caCert := os.Getenv(defaults.EnvNetBoxCACert); caCert != "" {
 		c.NetBox.CACert = caCert
+	}
+	if insecureSkipVerify := os.Getenv(defaults.EnvNetBoxInsecureSkipVerify); insecureSkipVerify != "" {
+		if val, err := strconv.ParseBool(insecureSkipVerify); err == nil {
+			c.NetBox.InsecureSkipVerify = val
+		}
 	}
 
 	// Default credentials overrides
