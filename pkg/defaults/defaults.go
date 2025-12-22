@@ -96,6 +96,7 @@ var (
 	NetBoxFieldRAMType           = getEnvOrDefault("NETBOX_FIELD_RAM_TYPE", "hw_memory_type")
 	NetBoxFieldRAMSpeedMHz       = getEnvOrDefault("NETBOX_FIELD_RAM_SPEED", "hw_memory_speed_mhz")
 	NetBoxFieldRAMMaxCapacityGB  = getEnvOrDefault("NETBOX_FIELD_RAM_MAX_CAPACITY", "hw_memory_max_capacity_gb")
+	NetBoxFieldDiskCount         = getEnvOrDefault("NETBOX_FIELD_DISK_COUNT", "hw_disk_count")
 	NetBoxFieldStorageSummary    = getEnvOrDefault("NETBOX_FIELD_STORAGE_SUMMARY", "hw_storage_summary")
 	NetBoxFieldStorageTotalTB    = getEnvOrDefault("NETBOX_FIELD_STORAGE_TOTAL", "hw_storage_total_tb")
 	NetBoxFieldBIOSVersion       = getEnvOrDefault("NETBOX_FIELD_BIOS_VERSION", "hw_bios_version")

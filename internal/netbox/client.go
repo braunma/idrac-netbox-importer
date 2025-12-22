@@ -41,6 +41,7 @@ type FieldNames struct {
 	RAMType           string
 	RAMSpeedMHz       string
 	RAMMaxCapacityGB  string
+	DiskCount         string
 	StorageSummary    string
 	StorageTotalTB    string
 	BIOSVersion       string
@@ -61,6 +62,7 @@ func DefaultFieldNames() FieldNames {
 		RAMType:          defaults.NetBoxFieldRAMType,
 		RAMSpeedMHz:      defaults.NetBoxFieldRAMSpeedMHz,
 		RAMMaxCapacityGB: defaults.NetBoxFieldRAMMaxCapacityGB,
+		DiskCount:        defaults.NetBoxFieldDiskCount,
 		StorageSummary:   defaults.NetBoxFieldStorageSummary,
 		StorageTotalTB:   defaults.NetBoxFieldStorageTotalTB,
 		BIOSVersion:      defaults.NetBoxFieldBIOSVersion,
@@ -381,7 +383,8 @@ func (c *Client) buildCustomFields(info models.ServerInfo) map[string]interface{
 		}
 	}
 
-	// Build storage summary (grouped by capacity)
+	// Add storage information
+	fields[c.fieldNames.DiskCount] = info.DriveCount
 	if len(info.Drives) > 0 {
 		fields[c.fieldNames.StorageSummary] = c.buildStorageSummary(info.Drives)
 	}

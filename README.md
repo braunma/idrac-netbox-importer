@@ -316,6 +316,7 @@ Create these custom fields on the Device model in NetBox:
 | `hw_memory_type` | Text | Memory type (e.g., DDR4, DDR5) |
 | `hw_memory_speed_mhz` | Integer | Memory speed in MHz |
 | `hw_memory_max_capacity_gb` | Integer | Maximum memory capacity (slots × largest module) |
+| `hw_disk_count` | Integer | Number of drives |
 | `hw_storage_summary` | Text | Storage grouped by capacity (e.g., "2x745GB, 16x14306GB") |
 | `hw_storage_total_tb` | Text | Total storage in TB |
 | `hw_bios_version` | Text | BIOS version |
@@ -496,6 +497,7 @@ CSV export for spreadsheet analysis:
 | `NETBOX_FIELD_RAM_TYPE` | Memory type field name | `hw_memory_type` |
 | `NETBOX_FIELD_RAM_SPEED` | Memory speed field name | `hw_memory_speed_mhz` |
 | `NETBOX_FIELD_RAM_MAX_CAPACITY` | Max memory capacity field name | `hw_memory_max_capacity_gb` |
+| `NETBOX_FIELD_DISK_COUNT` | Disk count field name | `hw_disk_count` |
 | `NETBOX_FIELD_STORAGE_SUMMARY` | Storage summary field name | `hw_storage_summary` |
 | `NETBOX_FIELD_STORAGE_TOTAL` | Total storage field name | `hw_storage_total_tb` |
 | `NETBOX_FIELD_BIOS_VERSION` | BIOS version field name | `hw_bios_version` |
