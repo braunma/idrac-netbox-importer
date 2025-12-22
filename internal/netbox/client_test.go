@@ -199,7 +199,7 @@ func TestClient_SyncServerInfo(t *testing.T) {
 	assert.Equal(t, float64(512), patchedFields["hw_ram_total_gb"])
 	assert.Equal(t, float64(32), patchedFields["hw_ram_slots_total"])
 	assert.Equal(t, float64(16), patchedFields["hw_ram_slots_used"])
-	assert.Equal(t, float64(16), patchedFields["hw_ram_slots_free"])
+	assert.Equal(t, float64(16), patchedFields["hw_ram_slots_available"])
 	assert.Equal(t, "DDR5", patchedFields["hw_memory_type"])
 	assert.Equal(t, float64(4800), patchedFields["hw_memory_speed_mhz"])
 	assert.Equal(t, float64(1024), patchedFields["hw_memory_max_capacity_gb"]) // 32 slots × 32 GB
@@ -373,7 +373,7 @@ func TestBuildCustomFields(t *testing.T) {
 	assert.Equal(t, 256, fields["hw_ram_total_gb"])
 	assert.Equal(t, 16, fields["hw_ram_slots_total"])
 	assert.Equal(t, 8, fields["hw_ram_slots_used"])
-	assert.Equal(t, 8, fields["hw_ram_slots_free"])
+	assert.Equal(t, 8, fields["hw_ram_slots_available"])
 	assert.Equal(t, "DDR4", fields["hw_memory_type"])
 	assert.Equal(t, 2933, fields["hw_memory_speed_mhz"])
 	assert.Equal(t, 512, fields["hw_memory_max_capacity_gb"]) // 16 slots × 32 GB

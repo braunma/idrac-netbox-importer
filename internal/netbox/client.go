@@ -37,7 +37,7 @@ type FieldNames struct {
 	RAMTotalGB        string
 	RAMSlotsTotal     string
 	RAMSlotsUsed      string
-	RAMSlotsFree      string
+	RAMSlotsAvailable string
 	RAMType           string
 	RAMSpeedMHz       string
 	RAMMaxCapacityGB  string
@@ -55,11 +55,11 @@ func DefaultFieldNames() FieldNames {
 		CPUCount:         defaults.NetBoxFieldCPUCount,
 		CPUModel:         defaults.NetBoxFieldCPUModel,
 		CPUCores:         defaults.NetBoxFieldCPUCores,
-		RAMTotalGB:       defaults.NetBoxFieldRAMTotalGB,
-		RAMSlotsTotal:    defaults.NetBoxFieldRAMSlotsTotal,
-		RAMSlotsUsed:     defaults.NetBoxFieldRAMSlotsUsed,
-		RAMSlotsFree:     defaults.NetBoxFieldRAMSlotsFree,
-		RAMType:          defaults.NetBoxFieldRAMType,
+		RAMTotalGB:        defaults.NetBoxFieldRAMTotalGB,
+		RAMSlotsTotal:     defaults.NetBoxFieldRAMSlotsTotal,
+		RAMSlotsUsed:      defaults.NetBoxFieldRAMSlotsUsed,
+		RAMSlotsAvailable: defaults.NetBoxFieldRAMSlotsAvailable,
+		RAMType:           defaults.NetBoxFieldRAMType,
 		RAMSpeedMHz:      defaults.NetBoxFieldRAMSpeedMHz,
 		RAMMaxCapacityGB: defaults.NetBoxFieldRAMMaxCapacityGB,
 		DiskCount:        defaults.NetBoxFieldDiskCount,
@@ -340,13 +340,13 @@ func (c *Client) SyncServerInfo(ctx context.Context, info models.ServerInfo) err
 // Uses configurable field names from the defaults package.
 func (c *Client) buildCustomFields(info models.ServerInfo) map[string]interface{} {
 	fields := map[string]interface{}{
-		c.fieldNames.CPUCount:       info.CPUCount,
-		c.fieldNames.CPUModel:       info.CPUModel,
-		c.fieldNames.RAMTotalGB:     int(info.TotalMemoryGiB),
-		c.fieldNames.RAMSlotsTotal:  info.MemorySlotsTotal,
-		c.fieldNames.RAMSlotsUsed:   info.MemorySlotsUsed,
-		c.fieldNames.RAMSlotsFree:   info.MemorySlotsFree,
-		c.fieldNames.StorageTotalTB: fmt.Sprintf("%.2f", info.TotalStorageTB),
+		c.fieldNames.CPUCount:         info.CPUCount,
+		c.fieldNames.CPUModel:         info.CPUModel,
+		c.fieldNames.RAMTotalGB:       int(info.TotalMemoryGiB),
+		c.fieldNames.RAMSlotsTotal:    info.MemorySlotsTotal,
+		c.fieldNames.RAMSlotsUsed:     info.MemorySlotsUsed,
+		c.fieldNames.RAMSlotsAvailable: info.MemorySlotsFree,
+		c.fieldNames.StorageTotalTB:   fmt.Sprintf("%.2f", info.TotalStorageTB),
 		c.fieldNames.BIOSVersion:    info.BiosVersion,
 		c.fieldNames.PowerState:     info.PowerState,
 		c.fieldNames.LastInventory:  info.CollectedAt.Format(time.RFC3339),

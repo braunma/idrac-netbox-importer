@@ -312,7 +312,7 @@ Create these custom fields on the Device model in NetBox:
 | `hw_ram_total_gb` | Integer | Total RAM in GB |
 | `hw_ram_slots_total` | Integer | Total memory slots |
 | `hw_ram_slots_used` | Integer | Used memory slots |
-| `hw_ram_slots_free` | Integer | Free memory slots |
+| `hw_ram_slots_available` | Integer | Available memory slots |
 | `hw_memory_type` | Text | Memory type (e.g., DDR4, DDR5) |
 | `hw_memory_speed_mhz` | Integer | Memory speed in MHz |
 | `hw_memory_max_capacity_gb` | Integer | Maximum memory capacity (slots × largest module) |
@@ -493,7 +493,7 @@ CSV export for spreadsheet analysis:
 | `NETBOX_FIELD_RAM_TOTAL` | Total RAM field name | `hw_ram_total_gb` |
 | `NETBOX_FIELD_RAM_SLOTS_TOTAL` | RAM slots total field name | `hw_ram_slots_total` |
 | `NETBOX_FIELD_RAM_SLOTS_USED` | RAM slots used field name | `hw_ram_slots_used` |
-| `NETBOX_FIELD_RAM_SLOTS_FREE` | RAM slots free field name | `hw_ram_slots_free` |
+| `NETBOX_FIELD_RAM_SLOTS_AVAILABLE` | RAM slots available field name | `hw_ram_slots_available` |
 | `NETBOX_FIELD_RAM_TYPE` | Memory type field name | `hw_memory_type` |
 | `NETBOX_FIELD_RAM_SPEED` | Memory speed field name | `hw_memory_speed_mhz` |
 | `NETBOX_FIELD_RAM_MAX_CAPACITY` | Max memory capacity field name | `hw_memory_max_capacity_gb` |
