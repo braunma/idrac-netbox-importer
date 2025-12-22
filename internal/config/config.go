@@ -354,8 +354,14 @@ func (c *Config) Validate() error {
 		}
 
 		if c.NetBox.URL != "" {
-			if _, err := url.Parse(c.NetBox.URL); err != nil {
+			parsed, err := url.Parse(c.NetBox.URL)
+			if err != nil {
 				multiErr.Add(errors.NewConfigError("netbox.url", fmt.Sprintf("invalid url: %v", err)))
+			} else {
+				// Ensure URL has a scheme (default to https if missing)
+				if parsed.Scheme == "" {
+					c.NetBox.URL = "https://" + c.NetBox.URL
+				}
 			}
 		}
 	}
