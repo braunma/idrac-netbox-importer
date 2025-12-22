@@ -162,6 +162,57 @@ servers:
 	assert.Contains(t, err.Error(), "token is required")
 }
 
+func TestParse_NetBoxURLNormalization(t *testing.T) {
+	clearTestEnv(t) // Clear environment variables that might interfere
+
+	tests := []struct {
+		name        string
+		inputURL    string
+		expectedURL string
+	}{
+		{
+			name:        "URL without scheme gets https:// prefix",
+			inputURL:    "netbox.example.com",
+			expectedURL: "https://netbox.example.com",
+		},
+		{
+			name:        "URL with https:// stays unchanged",
+			inputURL:    "https://netbox.example.com",
+			expectedURL: "https://netbox.example.com",
+		},
+		{
+			name:        "URL with http:// stays unchanged",
+			inputURL:    "http://netbox.example.com",
+			expectedURL: "http://netbox.example.com",
+		},
+		{
+			name:        "URL without scheme with path",
+			inputURL:    "netbox.example.com/api",
+			expectedURL: "https://netbox.example.com/api",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			yaml := `
+netbox:
+  url: "` + tt.inputURL + `"
+  token: "test-token"
+
+defaults:
+  username: "root"
+  password: "password"
+
+servers:
+  - host: "192.168.1.10"
+`
+			cfg, err := Parse([]byte(yaml))
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedURL, cfg.NetBox.URL, "URL should be normalized correctly")
+		})
+	}
+}
+
 func TestParse_InvalidLogLevel(t *testing.T) {
 	clearTestEnv(t) // Clear environment variables that might interfere
 
