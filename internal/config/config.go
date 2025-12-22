@@ -44,6 +44,7 @@ type NetBoxConfig struct {
 	Token              string `yaml:"token"`
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
 	TimeoutSeconds     int    `yaml:"timeout_seconds"`
+	CACert             string `yaml:"ca_cert"`
 }
 
 // IsEnabled returns true if NetBox integration is configured.
@@ -259,6 +260,9 @@ func (c *Config) applyEnvOverrides() {
 	if token := os.Getenv(defaults.EnvNetBoxToken); token != "" {
 		c.NetBox.Token = token
 	}
+	if caCert := os.Getenv(defaults.EnvNetBoxCACert); caCert != "" {
+		c.NetBox.CACert = caCert
+	}
 
 	// Default credentials overrides
 	if user := os.Getenv(defaults.EnvDefaultUsername); user != "" {
@@ -420,6 +424,7 @@ func EnvVarHelp() map[string]string {
 		defaults.EnvNetBoxToken:              "NetBox API token",
 		defaults.EnvNetBoxTimeout:            "NetBox API timeout in seconds (default: 30)",
 		defaults.EnvNetBoxInsecureSkipVerify: "Skip TLS verification for NetBox (default: false)",
+		defaults.EnvNetBoxCACert:             "CA_Chain - Custom CA certificate for NetBox (PEM format)",
 		defaults.EnvRetryMaxAttempts:         "Max retry attempts on failure (default: 3)",
 		defaults.EnvRetryBaseDelay:           "Base delay between retries (default: 1s)",
 		defaults.EnvRetryMaxDelay:            "Max delay between retries (default: 30s)",
