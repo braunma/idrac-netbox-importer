@@ -31,43 +31,45 @@ type Client struct {
 
 // FieldNames holds the configurable NetBox custom field names.
 type FieldNames struct {
-	CPUCount          string
-	CPUModel          string
-	CPUCores          string
-	RAMTotalGB        string
-	RAMSlotsTotal     string
-	RAMSlotsUsed      string
-	RAMSlotsAvailable string
-	RAMType           string
-	RAMSpeedMHz       string
-	RAMMaxCapacityGB  string
-	DiskCount         string
-	StorageSummary    string
-	StorageTotalTB    string
-	BIOSVersion       string
-	PowerState        string
-	LastInventory     string
+	CPUCount            string
+	CPUModel            string
+	CPUCores            string
+	RAMTotalGB          string
+	RAMSlotsTotal       string
+	RAMSlotsUsed        string
+	RAMSlotsAvailable   string
+	RAMType             string
+	RAMSpeedMHz         string
+	DiskCount           string
+	StorageSummary      string
+	StorageTotalTB      string
+	BIOSVersion         string
+	PowerState          string
+	PowerConsumedWatts  string
+	PowerPeakWatts      string
+	LastInventory       string
 }
 
 // DefaultFieldNames returns the default field names from the defaults package.
 func DefaultFieldNames() FieldNames {
 	return FieldNames{
-		CPUCount:         defaults.NetBoxFieldCPUCount,
-		CPUModel:         defaults.NetBoxFieldCPUModel,
-		CPUCores:         defaults.NetBoxFieldCPUCores,
-		RAMTotalGB:        defaults.NetBoxFieldRAMTotalGB,
-		RAMSlotsTotal:     defaults.NetBoxFieldRAMSlotsTotal,
-		RAMSlotsUsed:      defaults.NetBoxFieldRAMSlotsUsed,
-		RAMSlotsAvailable: defaults.NetBoxFieldRAMSlotsAvailable,
-		RAMType:           defaults.NetBoxFieldRAMType,
-		RAMSpeedMHz:      defaults.NetBoxFieldRAMSpeedMHz,
-		RAMMaxCapacityGB: defaults.NetBoxFieldRAMMaxCapacityGB,
-		DiskCount:        defaults.NetBoxFieldDiskCount,
-		StorageSummary:   defaults.NetBoxFieldStorageSummary,
-		StorageTotalTB:   defaults.NetBoxFieldStorageTotalTB,
-		BIOSVersion:      defaults.NetBoxFieldBIOSVersion,
-		PowerState:       defaults.NetBoxFieldPowerState,
-		LastInventory:    defaults.NetBoxFieldLastInventory,
+		CPUCount:           defaults.NetBoxFieldCPUCount,
+		CPUModel:           defaults.NetBoxFieldCPUModel,
+		CPUCores:           defaults.NetBoxFieldCPUCores,
+		RAMTotalGB:         defaults.NetBoxFieldRAMTotalGB,
+		RAMSlotsTotal:      defaults.NetBoxFieldRAMSlotsTotal,
+		RAMSlotsUsed:       defaults.NetBoxFieldRAMSlotsUsed,
+		RAMSlotsAvailable:  defaults.NetBoxFieldRAMSlotsAvailable,
+		RAMType:            defaults.NetBoxFieldRAMType,
+		RAMSpeedMHz:        defaults.NetBoxFieldRAMSpeedMHz,
+		DiskCount:          defaults.NetBoxFieldDiskCount,
+		StorageSummary:     defaults.NetBoxFieldStorageSummary,
+		StorageTotalTB:     defaults.NetBoxFieldStorageTotalTB,
+		BIOSVersion:        defaults.NetBoxFieldBIOSVersion,
+		PowerState:         defaults.NetBoxFieldPowerState,
+		PowerConsumedWatts: defaults.NetBoxFieldPowerConsumedWatts,
+		PowerPeakWatts:     defaults.NetBoxFieldPowerPeakWatts,
+		LastInventory:      defaults.NetBoxFieldLastInventory,
 	}
 }
 
@@ -369,15 +371,18 @@ func (c *Client) buildCustomFields(info models.ServerInfo) map[string]interface{
 		}
 	}
 
-	// Add maximum memory capacity if available
-	if info.MaxMemoryGiB > 0 {
-		fields[c.fieldNames.RAMMaxCapacityGB] = int(info.MaxMemoryGiB)
-	}
-
 	// Add storage information
 	fields[c.fieldNames.DiskCount] = info.DriveCount
 	if len(info.Drives) > 0 {
 		fields[c.fieldNames.StorageSummary] = c.buildStorageSummary(info.Drives)
+	}
+
+	// Add power consumption data if available
+	if info.PowerConsumedWatts > 0 {
+		fields[c.fieldNames.PowerConsumedWatts] = info.PowerConsumedWatts
+	}
+	if info.PowerPeakWatts > 0 {
+		fields[c.fieldNames.PowerPeakWatts] = info.PowerPeakWatts
 	}
 
 	return fields

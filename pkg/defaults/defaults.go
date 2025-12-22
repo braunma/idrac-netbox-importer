@@ -76,6 +76,7 @@ var (
 	RedfishProcessorsPath = getEnvOrDefault("REDFISH_PROCESSORS_PATH", "/redfish/v1/Systems/System.Embedded.1/Processors")
 	RedfishMemoryPath     = getEnvOrDefault("REDFISH_MEMORY_PATH", "/redfish/v1/Systems/System.Embedded.1/Memory")
 	RedfishStoragePath    = getEnvOrDefault("REDFISH_STORAGE_PATH", "/redfish/v1/Systems/System.Embedded.1/Storage")
+	RedfishPowerPath      = getEnvOrDefault("REDFISH_POWER_PATH", "/redfish/v1/Chassis/System.Embedded.1/Power")
 )
 
 // NetBox API paths
@@ -95,13 +96,14 @@ var (
 	NetBoxFieldRAMSlotsAvailable    = getEnvOrDefault("NETBOX_FIELD_RAM_SLOTS_AVAILABLE", "hw_ram_slots_available")
 	NetBoxFieldRAMType           = getEnvOrDefault("NETBOX_FIELD_RAM_TYPE", "hw_memory_type")
 	NetBoxFieldRAMSpeedMHz       = getEnvOrDefault("NETBOX_FIELD_RAM_SPEED", "hw_memory_speed_mhz")
-	NetBoxFieldRAMMaxCapacityGB  = getEnvOrDefault("NETBOX_FIELD_RAM_MAX_CAPACITY", "hw_memory_max_capacity_gb")
 	NetBoxFieldDiskCount         = getEnvOrDefault("NETBOX_FIELD_DISK_COUNT", "hw_disk_count")
 	NetBoxFieldStorageSummary    = getEnvOrDefault("NETBOX_FIELD_STORAGE_SUMMARY", "hw_storage_summary")
 	NetBoxFieldStorageTotalTB    = getEnvOrDefault("NETBOX_FIELD_STORAGE_TOTAL", "hw_storage_total_tb")
-	NetBoxFieldBIOSVersion       = getEnvOrDefault("NETBOX_FIELD_BIOS_VERSION", "hw_bios_version")
-	NetBoxFieldPowerState        = getEnvOrDefault("NETBOX_FIELD_POWER_STATE", "hw_power_state")
-	NetBoxFieldLastInventory     = getEnvOrDefault("NETBOX_FIELD_LAST_INVENTORY", "hw_last_inventory")
+	NetBoxFieldBIOSVersion          = getEnvOrDefault("NETBOX_FIELD_BIOS_VERSION", "hw_bios_version")
+	NetBoxFieldPowerState           = getEnvOrDefault("NETBOX_FIELD_POWER_STATE", "hw_power_state")
+	NetBoxFieldPowerConsumedWatts   = getEnvOrDefault("NETBOX_FIELD_POWER_CONSUMED_WATTS", "hw_power_consumed_watts")
+	NetBoxFieldPowerPeakWatts       = getEnvOrDefault("NETBOX_FIELD_POWER_PEAK_WATTS", "hw_power_peak_watts")
+	NetBoxFieldLastInventory        = getEnvOrDefault("NETBOX_FIELD_LAST_INVENTORY", "hw_last_inventory")
 )
 
 // Helper functions for reading environment variables with defaults
