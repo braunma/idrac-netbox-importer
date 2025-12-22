@@ -352,14 +352,24 @@ func (s *Scanner) collectProcessors(ctx context.Context, client *redfishClient, 
 			continue
 		}
 
+		// Derive CPU brand from manufacturer and model
+		brand := processor.Model
+		if processor.Manufacturer != "" && processor.Model != "" {
+			brand = processor.Manufacturer + " " + processor.Model
+		}
+
 		cpu := models.CPUInfo{
 			Socket:            processor.Socket,
 			Model:             processor.Model,
 			Manufacturer:      processor.Manufacturer,
+			Brand:             brand,
 			Cores:             processor.TotalCores,
 			Threads:           processor.TotalThreads,
 			MaxSpeedMHz:       processor.MaxSpeedMHz,
 			OperatingSpeedMHz: processor.OperatingSpeedMHz,
+			ProcessorType:     processor.ProcessorType,
+			Architecture:      processor.ProcessorArchitecture,
+			InstructionSet:    processor.InstructionSet,
 			Health:            processor.Status.Health,
 		}
 
@@ -412,15 +422,19 @@ func (s *Scanner) collectMemory(ctx context.Context, client *redfishClient, info
 		}
 
 		mem := models.MemoryInfo{
-			Slot:         slotName,
-			CapacityMiB:  memory.CapacityMiB,
-			Type:         memory.MemoryDeviceType,
-			SpeedMHz:     memory.OperatingSpeedMhz,
-			Manufacturer: memory.Manufacturer,
-			PartNumber:   memory.PartNumber,
-			SerialNumber: memory.SerialNumber,
-			State:        memory.Status.State,
-			Health:       memory.Status.Health,
+			Slot:           slotName,
+			CapacityMiB:    memory.CapacityMiB,
+			Type:           memory.MemoryDeviceType,
+			Technology:     memory.MemoryType,
+			BaseModuleType: memory.BaseModuleType,
+			SpeedMHz:       memory.OperatingSpeedMhz,
+			Manufacturer:   memory.Manufacturer,
+			PartNumber:     memory.PartNumber,
+			SerialNumber:   memory.SerialNumber,
+			RankCount:      memory.RankCount,
+			DataWidthBits:  memory.DataWidthBits,
+			State:          memory.Status.State,
+			Health:         memory.Status.Health,
 		}
 
 		memoryModules = append(memoryModules, mem)

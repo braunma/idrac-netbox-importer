@@ -93,17 +93,25 @@ type CPUInfo struct {
 	Socket            string `json:"socket"`
 	Model             string `json:"model"`
 	Manufacturer      string `json:"manufacturer"`
-	Cores             int    `json:"cores"`
-	Threads           int    `json:"threads"`
+	Brand             string `json:"brand"`              // CPU brand (e.g., "Intel Xeon", "AMD EPYC")
+	Cores             int    `json:"cores"`              // Physical core count
+	Threads           int    `json:"threads"`            // Logical thread count
 	MaxSpeedMHz       int    `json:"max_speed_mhz"`
 	OperatingSpeedMHz int    `json:"operating_speed_mhz"`
+	ProcessorType     string `json:"processor_type"`     // e.g., "CPU"
+	Architecture      string `json:"architecture"`       // e.g., "x86", "ARM"
+	InstructionSet    string `json:"instruction_set"`    // e.g., "x86-64"
 	Health            string `json:"health"`
 }
 
 // String returns a human-readable representation of the CPU.
 func (c CPUInfo) String() string {
+	brand := c.Model
+	if c.Brand != "" {
+		brand = c.Brand
+	}
 	return fmt.Sprintf("%s: %s (%d cores/%d threads @ %d MHz)",
-		c.Socket, c.Model, c.Cores, c.Threads, c.MaxSpeedMHz)
+		c.Socket, brand, c.Cores, c.Threads, c.MaxSpeedMHz)
 }
 
 // TotalSpeed returns the total theoretical speed (cores * speed).
@@ -113,15 +121,19 @@ func (c CPUInfo) TotalSpeed() int {
 
 // MemoryInfo contains detailed information about a single memory module or slot.
 type MemoryInfo struct {
-	Slot         string `json:"slot"`
-	CapacityMiB  int    `json:"capacity_mib"`
-	Type         string `json:"type"`
-	SpeedMHz     int    `json:"speed_mhz"`
-	Manufacturer string `json:"manufacturer"`
-	PartNumber   string `json:"part_number"`
-	SerialNumber string `json:"serial_number"`
-	State        string `json:"state"`
-	Health       string `json:"health"`
+	Slot           string `json:"slot"`
+	CapacityMiB    int    `json:"capacity_mib"`        // Module size in MiB
+	Type           string `json:"type"`                // Memory device type (e.g., "DDR4", "DDR5")
+	Technology     string `json:"technology"`          // Memory technology detail
+	BaseModuleType string `json:"base_module_type"`    // Module type (e.g., "RDIMM", "UDIMM", "LRDIMM")
+	SpeedMHz       int    `json:"speed_mhz"`           // Operating speed
+	Manufacturer   string `json:"manufacturer"`
+	PartNumber     string `json:"part_number"`
+	SerialNumber   string `json:"serial_number"`
+	RankCount      int    `json:"rank_count"`          // Number of ranks
+	DataWidthBits  int    `json:"data_width_bits"`     // Data width
+	State          string `json:"state"`
+	Health         string `json:"health"`
 }
 
 // Memory state constants as returned by Redfish API.
@@ -151,8 +163,15 @@ func (m MemoryInfo) String() string {
 	if m.IsEmpty() {
 		return fmt.Sprintf("%s: [empty]", m.Slot)
 	}
+
+	// Include base module type if available (e.g., "DDR4 RDIMM")
+	memType := m.Type
+	if m.BaseModuleType != "" && m.BaseModuleType != m.Type {
+		memType = fmt.Sprintf("%s %s", m.Type, m.BaseModuleType)
+	}
+
 	return fmt.Sprintf("%s: %.0f GB %s @ %d MHz (%s)",
-		m.Slot, m.CapacityGB(), m.Type, m.SpeedMHz, m.Manufacturer)
+		m.Slot, m.CapacityGB(), memType, m.SpeedMHz, m.Manufacturer)
 }
 
 // DriveInfo contains detailed information about a single storage drive.
