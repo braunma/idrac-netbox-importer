@@ -309,13 +309,14 @@ Create these custom fields on the Device model in NetBox:
 | `hw_cpu_count` | Integer | Number of CPUs |
 | `hw_cpu_model` | Text | CPU model name |
 | `hw_cpu_cores` | Integer | CPU cores per socket |
-| `hw_cpu_threads` | Integer | CPU threads per socket |
-| `hw_cpu_speed_mhz` | Integer | CPU speed in MHz |
 | `hw_ram_total_gb` | Integer | Total RAM in GB |
 | `hw_ram_slots_total` | Integer | Total memory slots |
 | `hw_ram_slots_used` | Integer | Used memory slots |
 | `hw_ram_slots_free` | Integer | Free memory slots |
-| `hw_disk_count` | Integer | Number of drives |
+| `hw_memory_type` | Text | Memory type (e.g., DDR4, DDR5) |
+| `hw_memory_speed_mhz` | Integer | Memory speed in MHz |
+| `hw_memory_max_capacity_gb` | Integer | Maximum memory capacity (slots × largest module) |
+| `hw_storage_summary` | Text | Storage grouped by capacity (e.g., "2x745GB, 16x14306GB") |
 | `hw_storage_total_tb` | Text | Total storage in TB |
 | `hw_bios_version` | Text | BIOS version |
 | `hw_power_state` | Text | Power state (On/Off) |
@@ -488,13 +489,14 @@ CSV export for spreadsheet analysis:
 | `NETBOX_FIELD_CPU_COUNT` | CPU count field name | `hw_cpu_count` |
 | `NETBOX_FIELD_CPU_MODEL` | CPU model field name | `hw_cpu_model` |
 | `NETBOX_FIELD_CPU_CORES` | CPU cores field name | `hw_cpu_cores` |
-| `NETBOX_FIELD_CPU_THREADS` | CPU threads field name | `hw_cpu_threads` |
-| `NETBOX_FIELD_CPU_SPEED` | CPU speed field name | `hw_cpu_speed_mhz` |
 | `NETBOX_FIELD_RAM_TOTAL` | Total RAM field name | `hw_ram_total_gb` |
 | `NETBOX_FIELD_RAM_SLOTS_TOTAL` | RAM slots total field name | `hw_ram_slots_total` |
 | `NETBOX_FIELD_RAM_SLOTS_USED` | RAM slots used field name | `hw_ram_slots_used` |
 | `NETBOX_FIELD_RAM_SLOTS_FREE` | RAM slots free field name | `hw_ram_slots_free` |
-| `NETBOX_FIELD_DISK_COUNT` | Disk count field name | `hw_disk_count` |
+| `NETBOX_FIELD_RAM_TYPE` | Memory type field name | `hw_memory_type` |
+| `NETBOX_FIELD_RAM_SPEED` | Memory speed field name | `hw_memory_speed_mhz` |
+| `NETBOX_FIELD_RAM_MAX_CAPACITY` | Max memory capacity field name | `hw_memory_max_capacity_gb` |
+| `NETBOX_FIELD_STORAGE_SUMMARY` | Storage summary field name | `hw_storage_summary` |
 | `NETBOX_FIELD_STORAGE_TOTAL` | Total storage field name | `hw_storage_total_tb` |
 | `NETBOX_FIELD_BIOS_VERSION` | BIOS version field name | `hw_bios_version` |
 | `NETBOX_FIELD_POWER_STATE` | Power state field name | `hw_power_state` |

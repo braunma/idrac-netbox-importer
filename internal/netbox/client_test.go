@@ -175,6 +175,20 @@ func TestClient_SyncServerInfo(t *testing.T) {
 		CPUs: []models.CPUInfo{
 			{Cores: 24, Threads: 48, MaxSpeedMHz: 2800},
 		},
+		Memory: []models.MemoryInfo{
+			{CapacityMiB: 32768, Type: "DDR5", SpeedMHz: 4800, State: models.MemoryStateEnabled},
+			{CapacityMiB: 32768, Type: "DDR5", SpeedMHz: 4800, State: models.MemoryStateEnabled},
+		},
+		Drives: []models.DriveInfo{
+			{CapacityGB: 960},
+			{CapacityGB: 960},
+			{CapacityGB: 960},
+			{CapacityGB: 960},
+			{CapacityGB: 1920},
+			{CapacityGB: 1920},
+			{CapacityGB: 1920},
+			{CapacityGB: 1920},
+		},
 	}
 
 	err := client.SyncServerInfo(ctx, info)
@@ -186,7 +200,10 @@ func TestClient_SyncServerInfo(t *testing.T) {
 	assert.Equal(t, float64(32), patchedFields["hw_ram_slots_total"])
 	assert.Equal(t, float64(16), patchedFields["hw_ram_slots_used"])
 	assert.Equal(t, float64(16), patchedFields["hw_ram_slots_free"])
-	assert.Equal(t, float64(8), patchedFields["hw_disk_count"])
+	assert.Equal(t, "DDR5", patchedFields["hw_memory_type"])
+	assert.Equal(t, float64(4800), patchedFields["hw_memory_speed_mhz"])
+	assert.Equal(t, float64(1024), patchedFields["hw_memory_max_capacity_gb"]) // 32 slots × 32 GB
+	assert.Equal(t, "4x960GB, 4x1920GB", patchedFields["hw_storage_summary"])
 	assert.Equal(t, "1.5.1", patchedFields["hw_bios_version"])
 	assert.Equal(t, float64(24), patchedFields["hw_cpu_cores"])
 }
@@ -331,21 +348,40 @@ func TestBuildCustomFields(t *testing.T) {
 		CPUs: []models.CPUInfo{
 			{Cores: 16, Threads: 32, MaxSpeedMHz: 3200},
 		},
+		Memory: []models.MemoryInfo{
+			{CapacityMiB: 32768, Type: "DDR4", SpeedMHz: 2933, State: models.MemoryStateEnabled},
+			{CapacityMiB: 32768, Type: "DDR4", SpeedMHz: 2933, State: models.MemoryStateEnabled},
+			{State: models.MemoryStateAbsent},
+		},
+		Drives: []models.DriveInfo{
+			{CapacityGB: 960},
+			{CapacityGB: 960},
+			{CapacityGB: 1920},
+			{CapacityGB: 1920},
+		},
 	}
 
 	fields := client.buildCustomFields(info)
 
+	// CPU fields
 	assert.Equal(t, 2, fields["hw_cpu_count"])
 	assert.Equal(t, "Intel Xeon", fields["hw_cpu_model"])
+	assert.Equal(t, 16, fields["hw_cpu_cores"])
+
+	// Memory fields
 	assert.Equal(t, 256, fields["hw_ram_total_gb"])
 	assert.Equal(t, 16, fields["hw_ram_slots_total"])
 	assert.Equal(t, 8, fields["hw_ram_slots_used"])
 	assert.Equal(t, 8, fields["hw_ram_slots_free"])
-	assert.Equal(t, 4, fields["hw_disk_count"])
+	assert.Equal(t, "DDR4", fields["hw_memory_type"])
+	assert.Equal(t, 2933, fields["hw_memory_speed_mhz"])
+	assert.Equal(t, 512, fields["hw_memory_max_capacity_gb"]) // 16 slots × 32 GB
+
+	// Storage fields
+	assert.Equal(t, "2x960GB, 2x1920GB", fields["hw_storage_summary"])
 	assert.Equal(t, "3.84", fields["hw_storage_total_tb"])
+
+	// System fields
 	assert.Equal(t, "2.0.0", fields["hw_bios_version"])
 	assert.Equal(t, "On", fields["hw_power_state"])
-	assert.Equal(t, 16, fields["hw_cpu_cores"])
-	assert.Equal(t, 32, fields["hw_cpu_threads"])
-	assert.Equal(t, 3200, fields["hw_cpu_speed_mhz"])
 }
