@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -85,15 +86,29 @@ func WithHTTPClient(httpClient *http.Client) ClientOption {
 
 // NewClient creates a new NetBox API client.
 func NewClient(cfg config.NetBoxConfig, opts ...ClientOption) *Client {
+	// Build TLS config
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: cfg.InsecureSkipVerify,
+	}
+
+	// Add custom CA certificate if provided
+	if cfg.CACert != "" {
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM([]byte(cfg.CACert)); !ok {
+			logging.Warn("Failed to parse CA certificate, using system cert pool")
+		} else {
+			tlsConfig.RootCAs = certPool
+			logging.Debug("Custom CA certificate loaded for NetBox connection")
+		}
+	}
+
 	c := &Client{
 		baseURL: cfg.URL,
 		token:   cfg.Token,
 		httpClient: &http.Client{
 			Timeout: cfg.Timeout(),
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: cfg.InsecureSkipVerify,
-				},
+				TLSClientConfig: tlsConfig,
 				MaxIdleConns:    defaults.DefaultHTTPMaxIdleConns,
 				IdleConnTimeout: defaults.GetHTTPIdleConnTimeout(),
 			},
