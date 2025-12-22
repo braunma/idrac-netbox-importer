@@ -363,19 +363,49 @@ func (c *Client) buildCustomFields(info models.ServerInfo) map[string]interface{
 // It tries service tag first (which includes fallback to serial), then tries
 // serial number directly if service tag is empty.
 func (c *Client) findDevice(ctx context.Context, info models.ServerInfo) (*Device, error) {
+	c.logger.Infow("searching for device in NetBox",
+		"host", info.Host,
+		"service_tag", info.ServiceTag,
+		"serial_number", info.SerialNumber,
+	)
+
 	// Try service tag first (includes serial fallback internally)
 	if info.ServiceTag != "" {
+		c.logger.Debugw("attempting lookup by service tag",
+			"service_tag", info.ServiceTag,
+		)
 		device, err := c.FindDeviceByServiceTag(ctx, info.ServiceTag)
 		if err != nil || device != nil {
+			if device != nil {
+				c.logger.Infow("device found by service tag",
+					"service_tag", info.ServiceTag,
+					"device_id", device.ID,
+					"device_name", device.Name,
+				)
+			}
 			return device, err
 		}
 	}
 
 	// Try serial number directly if service tag wasn't provided or didn't match
 	if info.SerialNumber != "" {
-		return c.FindDeviceBySerial(ctx, info.SerialNumber)
+		c.logger.Debugw("attempting lookup by serial number",
+			"serial_number", info.SerialNumber,
+		)
+		device, err := c.FindDeviceBySerial(ctx, info.SerialNumber)
+		if device != nil {
+			c.logger.Infow("device found by serial number",
+				"serial_number", info.SerialNumber,
+				"device_id", device.ID,
+				"device_name", device.Name,
+			)
+		}
+		return device, err
 	}
 
+	c.logger.Warnw("no service tag or serial number available for device lookup",
+		"host", info.Host,
+	)
 	return nil, nil
 }
 

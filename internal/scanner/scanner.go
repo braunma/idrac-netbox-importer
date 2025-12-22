@@ -258,6 +258,8 @@ func (s *Scanner) scanServer(ctx context.Context, server config.ServerConfig) mo
 	s.logger.Infow("server scan completed",
 		"host", server.Host,
 		"model", info.Model,
+		"serial_number", info.SerialNumber,
+		"service_tag", info.ServiceTag,
 		"cpus", info.CPUCount,
 		"ram_gb", info.TotalMemoryGiB,
 		"drives", info.DriveCount,
