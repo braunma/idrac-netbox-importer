@@ -1,21 +1,53 @@
 # =============================================================================
-# GitLab CI/CD Variables Example
+# GitLab CI/CD Variables — Example / Template
 # =============================================================================
-# This file shows what variables you should set in GitLab:
-# Settings → CI/CD → Variables
-#
-# DO NOT commit actual credentials to this file!
-# This is just an example/template.
+# This file documents every variable the pipeline understands.
+# DO NOT commit real credentials here — set them in GitLab instead:
+#   Settings → CI/CD → Variables
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Required Variables for iDRAC Access
+# Pipeline behaviour variables
+# These can be set as project defaults OR overridden per-run via
+# "Run pipeline → Variables" in the GitLab UI.
 # -----------------------------------------------------------------------------
-# Set these in GitLab CI/CD Variables as "Masked" and "Protected"
+
+RUN_TESTS:
+  description: >
+    Set to "false" to skip the test suite and only compile the binary.
+    The scan-and-store job still runs; this only shortens the build stage.
+    Use for quick scans when time is limited.
+  value: "true"        # default — run tests on every build
+  masked: false
+  protected: false
+
+SYNC_NETBOX:
+  description: >
+    Set to "true" to push the freshly scanned inventory into NetBox after
+    the scan completes. Requires NETBOX_URL and NETBOX_TOKEN to be set.
+    When "false" (default) only the in-repo inventory files are updated.
+  value: "false"
+  masked: false
+  protected: false
+
+INVENTORY_DIR:
+  description: >
+    Sub-folder inside this repository where the Markdown and JSON inventory
+    reports are committed by the scan-and-store job.
+    Changing this does NOT move existing files; create a migration commit
+    manually if you rename it.
+  value: "inventory"
+  masked: false
+  protected: false
+
+# -----------------------------------------------------------------------------
+# iDRAC credentials
+# Mark these as Masked (and Protected for production) in the GitLab UI.
+# -----------------------------------------------------------------------------
 
 IDRAC_DEFAULT_USER:
   description: "Default username for iDRAC authentication"
-  value: "root"  # Example - replace with your default
+  value: "root"
   masked: true
   protected: false
 
@@ -26,12 +58,11 @@ IDRAC_DEFAULT_PASS:
   protected: true
 
 # -----------------------------------------------------------------------------
-# NetBox Integration Variables
+# NetBox integration (only required when SYNC_NETBOX=true)
 # -----------------------------------------------------------------------------
-# Set these if you want to sync inventory to NetBox
 
 NETBOX_URL:
-  description: "NetBox API URL"
+  description: "NetBox API base URL, e.g. https://netbox.example.com"
   value: "https://netbox.yourdomain.com"
   masked: false
   protected: false
@@ -43,69 +74,50 @@ NETBOX_TOKEN:
   protected: true
 
 # -----------------------------------------------------------------------------
-# Optional Configuration Variables
+# Optional tuning
 # -----------------------------------------------------------------------------
 
 IDRAC_LOG_LEVEL:
-  description: "Logging level (debug, info, warn, error)"
+  description: "Logging level: debug, info, warn, error"
   value: "info"
   masked: false
   protected: false
 
 IDRAC_CONCURRENCY:
-  description: "Maximum parallel scans"
+  description: "Maximum number of parallel iDRAC scans"
   value: "10"
   masked: false
   protected: false
 
 IDRAC_DEFAULT_TIMEOUT:
-  description: "Connection timeout in seconds"
+  description: "Per-host connection timeout in seconds"
   value: "60"
   masked: false
   protected: false
 
 # =============================================================================
-# How to Set These Variables in GitLab
+# Quick-start: common pipeline invocations
 # =============================================================================
 #
-# 1. Go to your GitLab project
-# 2. Navigate to: Settings → CI/CD → Variables
-# 3. Click "Add variable"
-# 4. For each variable above:
-#    - Key: Use the variable name (e.g., IDRAC_DEFAULT_USER)
-#    - Value: Enter the actual value
-#    - Type: Variable
-#    - Flags:
-#      - [x] Protect variable (for production secrets)
-#      - [x] Mask variable (for passwords/tokens)
-#      - [ ] Expand variable reference (usually unchecked)
+# Fast scan (no tests, store results in repo, skip NetBox):
+#   RUN_TESTS=false  SYNC_NETBOX=false
+#
+# Full run (tests + store in repo, skip NetBox):
+#   RUN_TESTS=true   SYNC_NETBOX=false
+#
+# Full run + NetBox push:
+#   RUN_TESTS=true   SYNC_NETBOX=true
+#
+# In all cases the scan-and-store job is MANUAL — go to the pipeline view
+# in GitLab and click the ▶ Play button to trigger it.
 #
 # =============================================================================
-# Variable Scopes
+# One-time setup: allow CI to push back to this repo
 # =============================================================================
 #
-# You can set different values for different environments:
+# The scan-and-store job commits inventory files and pushes them to this repo
+# using CI_JOB_TOKEN.  Enable that in:
+#   Settings → CI/CD → Token Access → "Allow CI Job Token to push to this project"
 #
-# Example:
-# - IDRAC_DEFAULT_USER (all branches) = "readonly_user"
-# - IDRAC_DEFAULT_USER (main branch) = "admin_user"
-# - IDRAC_DEFAULT_PASS (all branches) = "readonly_pass"
-# - IDRAC_DEFAULT_PASS (main branch) = "admin_pass"
-#
-# This allows read-only access in dev branches and full access in main/production.
-#
-# =============================================================================
-# Using Variables in Your Pipeline
-# =============================================================================
-#
-# Variables are automatically available in all jobs:
-#
-# docker run --rm \
-#   -e IDRAC_DEFAULT_USER=$IDRAC_DEFAULT_USER \
-#   -e IDRAC_DEFAULT_PASS=$IDRAC_DEFAULT_PASS \
-#   -e NETBOX_URL=$NETBOX_URL \
-#   -e NETBOX_TOKEN=$NETBOX_TOKEN \
-#   $CI_REGISTRY_IMAGE:latest \
-#   -config /app/config.yaml -sync
-#
+# On self-hosted GitLab instances this is often already permitted by default.
 # =============================================================================

@@ -217,12 +217,16 @@ func run(ctx context.Context, cfg *config.Config, f *flags) error {
 		return fmt.Errorf("failed to output results: %w", err)
 	}
 
-	// Sync to NetBox if requested
+	// Sync to NetBox if requested.
+	// Note: we do NOT return here so that a GitLab export (-gitlab-repo) can
+	// still run afterwards when both -sync and -gitlab-push are combined.
 	if f.syncNetBox {
 		if !cfg.NetBox.IsEnabled() {
 			logging.Warn("NetBox sync requested but not configured")
 		} else {
-			return runNetBoxSync(ctx, cfg, results)
+			if err := runNetBoxSync(ctx, cfg, results); err != nil {
+				return err
+			}
 		}
 	}
 
