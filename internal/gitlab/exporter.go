@@ -112,7 +112,7 @@ func (e *Exporter) Export(inv models.AggregatedInventory) error {
 	msg := fmt.Sprintf(
 		"inventory: update hardware report %s\n\nScanned: %d | Success: %d | Failed: %d | Groups: %d",
 		inv.GeneratedAt.Format("2006-01-02 15:04:05 UTC"),
-		inv.TotalServers, inv.SuccessCount, inv.FailedCount, len(inv.Groups),
+		inv.TotalServers, inv.SuccessfulCount, inv.FailedCount, len(inv.Groups),
 	)
 	if err := e.gitCommit(msg); err != nil {
 		return fmt.Errorf("git commit failed: %w", err)

@@ -27,7 +27,7 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 	fmt.Fprintf(w, "# Hardware Inventory Report\n\n")
 	fmt.Fprintf(w, "> **Generated:** %s  \n", inv.GeneratedAt.Format("2006-01-02 15:04:05 UTC"))
 	fmt.Fprintf(w, "> **Scanned:** %d servers &nbsp;|&nbsp; **Success:** %d &nbsp;|&nbsp; **Failed:** %d\n\n",
-		inv.TotalServers, inv.SuccessCount, inv.FailedCount)
+		inv.TotalServers, inv.SuccessfulCount, inv.FailedCount)
 
 	fmt.Fprintf(w, "---\n\n")
 
@@ -62,7 +62,7 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 			fp.StorageSummary,
 		)
 	}
-	if inv.FailedCount > 0 {
+	if len(inv.FailedServers) > 0 {
 		fmt.Fprintf(w, "| — | **%d** | ❌ Failed | — | — | — | — | — |\n", inv.FailedCount)
 	}
 
@@ -98,8 +98,8 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 func (f *MarkdownFormatter) writeGroup(w io.Writer, idx int, group models.HardwareGroup) {
 	fp := group.Fingerprint
 
-	// Anchor for the summary table links
-	fmt.Fprintf(w, "<a name=\"group-%d\"></a>\n\n", idx)
+	// Anchor for the summary table links (id= is the HTML5 standard; name= is obsolete).
+	fmt.Fprintf(w, "<a id=\"group-%d\"></a>\n\n", idx)
 	fmt.Fprintf(w, "### Group %d — %d× %s\n\n", idx, group.Count, fp.DisplayModel())
 
 	// Hardware spec table

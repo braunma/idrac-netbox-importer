@@ -247,14 +247,20 @@ func run(ctx context.Context, cfg *config.Config, f *flags) error {
 
 // runGitLabExport aggregates the scan results and commits them to a local git repository.
 func runGitLabExport(f *flags, cfg *config.Config, results []models.ServerInfo, stats models.CollectionStats, repoPath string) error {
-	// CLI flags take precedence over config-file values.
-	branch := f.gitlabBranch
-	if branch == "main" && cfg.GitLab.Branch != "" {
-		branch = cfg.GitLab.Branch
+	// Determine which flags were explicitly provided on the command line.
+	// flag.Visit only walks flags that were actually set, so we can tell apart
+	// "user passed -gitlab-branch main" from "flag kept its default value".
+	explicit := map[string]bool{}
+	flag.Visit(func(fl *flag.Flag) { explicit[fl.Name] = true })
+
+	// Config file is the base; an explicit CLI flag always wins.
+	branch := cfg.GitLab.Branch
+	if branch == "" || explicit["gitlab-branch"] {
+		branch = f.gitlabBranch
 	}
-	dir := f.gitlabDir
-	if dir == "inventory" && cfg.GitLab.InventoryDir != "" {
-		dir = cfg.GitLab.InventoryDir
+	dir := cfg.GitLab.InventoryDir
+	if dir == "" || explicit["gitlab-dir"] {
+		dir = f.gitlabDir
 	}
 	push := f.gitlabPush || cfg.GitLab.Push
 

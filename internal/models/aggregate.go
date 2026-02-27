@@ -53,13 +53,13 @@ type HardwareGroup struct {
 
 // AggregatedInventory is the top-level structure for the aggregated hardware report.
 type AggregatedInventory struct {
-	GeneratedAt   time.Time       `json:"generated_at"`
-	TotalServers  int             `json:"total_servers"`
-	SuccessCount  int             `json:"successful_count"`
-	FailedCount   int             `json:"failed_count"`
-	Groups        []HardwareGroup `json:"groups"`
-	FailedServers []ServerInfo    `json:"failed_servers,omitempty"`
-	Stats         CollectionStats `json:"stats"`
+	GeneratedAt    time.Time       `json:"generated_at"`
+	TotalServers   int             `json:"total_servers"`
+	SuccessfulCount int            `json:"successful_count"`
+	FailedCount    int             `json:"failed_count"`
+	Groups         []HardwareGroup `json:"groups"`
+	FailedServers  []ServerInfo    `json:"failed_servers,omitempty"`
+	Stats          CollectionStats `json:"stats"`
 }
 
 // GroupByConfiguration groups servers that share the same hardware configuration.
@@ -81,7 +81,7 @@ func GroupByConfiguration(servers []ServerInfo, stats CollectionStats) Aggregate
 			continue
 		}
 
-		inv.SuccessCount++
+		inv.SuccessfulCount++
 		fp := buildFingerprint(srv)
 		key := fp.Key()
 

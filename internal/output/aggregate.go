@@ -33,7 +33,7 @@ func (f *AggregatedConsoleFormatter) FormatAggregated(w io.Writer, inv models.Ag
 	fmt.Fprintf(w, "  Generated: %s\n", inv.GeneratedAt.Format("2006-01-02 15:04:05 UTC"))
 	fmt.Fprintf(w, "%s\n", line)
 	fmt.Fprintf(w, "  Total: %d servers  |  Success: %d  |  Failed: %d  |  Config groups: %d\n",
-		inv.TotalServers, inv.SuccessCount, inv.FailedCount, len(inv.Groups))
+		inv.TotalServers, inv.SuccessfulCount, inv.FailedCount, len(inv.Groups))
 	if inv.Stats.TotalDuration > 0 {
 		fmt.Fprintf(w, "  Scan time: %s total  |  avg %s/server\n",
 			inv.Stats.TotalDuration.Round(time.Millisecond),
