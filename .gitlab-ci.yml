@@ -1,30 +1,69 @@
 # =============================================================================
-# GitLab CI/CD Pipeline for iDRAC NetBox Importer
+# GitLab CI/CD Pipeline — iDRAC NetBox Importer
 # =============================================================================
+#
+# PIPELINE VARIABLES
+# Set these in Settings → CI/CD → Variables, or override them each time you
+# click "Run pipeline" in the GitLab UI.
+#
+#   RUN_TESTS     "true" (default) | "false"
+#                 When "false" the binary is still compiled but the test suite
+#                 is skipped — useful for a quick scan when time is short.
+#
+#   SYNC_NETBOX   "false" (default) | "true"
+#                 When "true" the scanner also pushes the fresh inventory into
+#                 NetBox. Requires NETBOX_URL + NETBOX_TOKEN to be set.
+#
+#   INVENTORY_DIR "inventory" (default)
+#                 Sub-folder inside *this* repo where the Markdown / JSON
+#                 reports are committed after every scan.
+#
+# TYPICAL USAGE
+#   Full run (tests + no NetBox)  →  RUN_TESTS=true,  SYNC_NETBOX=false
+#   Fast scan (no tests/NetBox)   →  RUN_TESTS=false, SYNC_NETBOX=false
+#   Full run + NetBox             →  RUN_TESTS=true,  SYNC_NETBOX=true
+#
+# PUSH-BACK REQUIREMENT
+#   The scan-and-store job commits inventory files back to this repo using
+#   CI_JOB_TOKEN.  For this to work you must enable project-level CI token
+#   write access:
+#     Settings → CI/CD → Token Access → "Allow CI Job Token to push"
+#   (On self-hosted GitLab this is often already allowed by default.)
+# =============================================================================
+
 default:
   tags:
     - gitlab-runner-03
+
+variables:
+  RUN_TESTS: "true"
+  SYNC_NETBOX: "false"
+  INVENTORY_DIR: "inventory"
 
 stages:
   - build
   - scan
 
 # =============================================================================
-# Build and Test
+# Build — compile the binary and (optionally) run the test suite
 # =============================================================================
 
-build-and-test:
+build:
   stage: build
   image: golang:1.22-alpine
   before_script:
     - apk add --no-cache git
   script:
-    - echo "Building and testing..."
     - go mod download
-    - go build -v ./...
-    - go test ./... -v
+    - |
+      if [ "$RUN_TESTS" = "true" ]; then
+        echo "=== Running tests ==="
+        go test ./... -v
+      else
+        echo "=== Skipping tests (RUN_TESTS=false) ==="
+      fi
     - go build -o idrac-inventory ./cmd/idrac-inventory
-    - echo "✅ Build and tests completed"
+    - echo "=== Build complete ==="
   artifacts:
     paths:
       - idrac-inventory
@@ -32,19 +71,47 @@ build-and-test:
     expire_in: 1 day
 
 # =============================================================================
-# Run Scanner
+# Scan + Store — scan iDRAC servers and commit inventory back into this repo
 # =============================================================================
-run-scanner:
+#
+# This job is MANUAL so it never runs accidentally on an ordinary code push.
+# To trigger it:
+#   1. Open the pipeline in GitLab UI
+#   2. Click the ▶ Play button on "scan-and-store"
+#
+# Override RUN_TESTS / SYNC_NETBOX at "Run pipeline" time for the fast-scan
+# workflow (no tests, no NetBox, just scan and commit).
+# =============================================================================
+
+scan-and-store:
   stage: scan
   image: alpine:3.21
+  before_script:
+    - apk add --no-cache git
+    # Allow this job to push commits back to the repo using the CI job token.
+    - git remote set-url origin
+        "https://oauth2:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    # GitLab clones in detached-HEAD mode; switch to an actual branch so that
+    # the inventory commit lands on the right ref and can be pushed.
+    - git fetch origin "${CI_COMMIT_REF_NAME}"
+    - git checkout -B "${CI_COMMIT_REF_NAME}" "origin/${CI_COMMIT_REF_NAME}"
   script:
     - chmod +x ./idrac-inventory
-    - ./idrac-inventory -config config.yaml -sync -output json > scan-results.json
-    - cat scan-results.json
-  artifacts:
-    paths:
-      - scan-results.json
-    expire_in: 7 days
+    - |
+      # Build the flag list dynamically from pipeline variables.
+      ARGS="-config config.yaml"
+      ARGS="$ARGS -gitlab-repo   ${CI_PROJECT_DIR}"
+      ARGS="$ARGS -gitlab-dir    ${INVENTORY_DIR}"
+      ARGS="$ARGS -gitlab-branch ${CI_COMMIT_REF_NAME}"
+      ARGS="$ARGS -gitlab-push"
+
+      if [ "$SYNC_NETBOX" = "true" ]; then
+        echo "=== NetBox sync enabled ==="
+        ARGS="$ARGS -sync"
+      fi
+
+      echo "=== Starting iDRAC scan ==="
+      ./idrac-inventory $ARGS
   dependencies:
-    - build-and-test
+    - build
   when: manual

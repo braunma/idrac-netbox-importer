@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"idrac-inventory/internal/config"
+	"idrac-inventory/internal/gitlab"
 	"idrac-inventory/internal/models"
 	"idrac-inventory/internal/netbox"
 	"idrac-inventory/internal/output"
@@ -42,6 +43,13 @@ type flags struct {
 	// Actions
 	syncNetBox          bool
 	validateConnections bool
+
+	// GitLab export — write an aggregated report into a local git repo.
+	// The report is always aggregated when this flag is used.
+	gitlabRepo   string // path to local git repository
+	gitlabBranch string // branch to commit to (default: "main")
+	gitlabDir    string // sub-directory for inventory files (default: "inventory")
+	gitlabPush   bool   // push to remote after committing
 
 	// Misc
 	version  bool
@@ -105,6 +113,12 @@ func parseFlags() *flags {
 	flag.BoolVar(&f.syncNetBox, "sync", false, "Sync results to NetBox")
 	flag.BoolVar(&f.validateConnections, "validate", false, "Only validate connections, don't collect inventory")
 
+	// GitLab export
+	flag.StringVar(&f.gitlabRepo, "gitlab-repo", "", "Path to local git repository; triggers aggregated export")
+	flag.StringVar(&f.gitlabBranch, "gitlab-branch", "main", "Git branch to commit the inventory to")
+	flag.StringVar(&f.gitlabDir, "gitlab-dir", "inventory", "Sub-directory inside the repo for inventory files")
+	flag.BoolVar(&f.gitlabPush, "gitlab-push", false, "Push to the remote after committing")
+
 	// Misc
 	flag.BoolVar(&f.version, "version", false, "Show version information")
 	flag.StringVar(&f.logLevel, "log-level", "info", "Log level: debug, info, warn, error")
@@ -124,6 +138,12 @@ func parseFlags() *flags {
 		fmt.Fprintf(os.Stderr, "  %s -config config.yaml -sync\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  # Output as JSON\n")
 		fmt.Fprintf(os.Stderr, "  %s -config config.yaml -output json\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  # Aggregated console view (group identical hardware)\n")
+		fmt.Fprintf(os.Stderr, "  %s -config config.yaml -output aggregate\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  # Export aggregated report to a local GitLab repo\n")
+		fmt.Fprintf(os.Stderr, "  %s -config config.yaml -gitlab-repo /path/to/repo\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  # Export and push to remote\n")
+		fmt.Fprintf(os.Stderr, "  %s -config config.yaml -gitlab-repo /path/to/repo -gitlab-push\n\n", os.Args[0])
 	}
 
 	flag.Parse()
@@ -197,18 +217,85 @@ func run(ctx context.Context, cfg *config.Config, f *flags) error {
 		return fmt.Errorf("failed to output results: %w", err)
 	}
 
-	// Sync to NetBox if requested
+	// Sync to NetBox if requested.
+	// Note: we do NOT return here so that a GitLab export (-gitlab-repo) can
+	// still run afterwards when both -sync and -gitlab-push are combined.
 	if f.syncNetBox {
 		if !cfg.NetBox.IsEnabled() {
 			logging.Warn("NetBox sync requested but not configured")
 		} else {
-			return runNetBoxSync(ctx, cfg, results)
+			if err := runNetBoxSync(ctx, cfg, results); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Export aggregated report to a local git repository (GitLab) if requested.
+	repoPath := f.gitlabRepo
+	if repoPath == "" {
+		repoPath = cfg.GitLab.RepoPath
+	}
+	if repoPath != "" {
+		if err := runGitLabExport(f, cfg, results, stats, repoPath); err != nil {
+			return err
 		}
 	}
 
 	// Return error if any servers failed
 	if stats.FailedCount > 0 {
 		return fmt.Errorf("%d of %d servers failed", stats.FailedCount, stats.TotalServers)
+	}
+
+	return nil
+}
+
+// runGitLabExport aggregates the scan results and commits them to a local git repository.
+func runGitLabExport(f *flags, cfg *config.Config, results []models.ServerInfo, stats models.CollectionStats, repoPath string) error {
+	// Determine which flags were explicitly provided on the command line.
+	// flag.Visit only walks flags that were actually set, so we can tell apart
+	// "user passed -gitlab-branch main" from "flag kept its default value".
+	explicit := map[string]bool{}
+	flag.Visit(func(fl *flag.Flag) { explicit[fl.Name] = true })
+
+	// Config file is the base; an explicit CLI flag always wins.
+	branch := cfg.GitLab.Branch
+	if branch == "" || explicit["gitlab-branch"] {
+		branch = f.gitlabBranch
+	}
+	dir := cfg.GitLab.InventoryDir
+	if dir == "" || explicit["gitlab-dir"] {
+		dir = f.gitlabDir
+	}
+	push := f.gitlabPush || cfg.GitLab.Push
+
+	inv := models.GroupByConfiguration(results, stats)
+
+	logging.Info("Exporting aggregated inventory to git repository",
+		"repo", repoPath,
+		"branch", branch,
+		"dir", dir,
+		"groups", len(inv.Groups),
+		"total_servers", inv.TotalServers,
+	)
+
+	exp := gitlab.New(gitlab.Config{
+		RepoPath:     repoPath,
+		Branch:       branch,
+		InventoryDir: dir,
+		AuthorName:   cfg.GitLab.AuthorName,
+		AuthorEmail:  cfg.GitLab.AuthorEmail,
+		Push:         push,
+	})
+
+	if err := exp.Export(inv); err != nil {
+		return fmt.Errorf("gitlab export failed: %w", err)
+	}
+
+	fmt.Printf("\nInventory exported to: %s/%s/\n", repoPath, dir)
+	if push {
+		fmt.Printf("Pushed to remote branch: %s\n", branch)
+	} else {
+		fmt.Printf("Committed locally on branch: %s (use -gitlab-push to push to remote)\n", branch)
 	}
 
 	return nil
@@ -232,8 +319,13 @@ func runValidateConnections(ctx context.Context, s *scanner.Scanner) error {
 }
 
 func outputResults(f *flags, results []models.ServerInfo, stats models.CollectionStats) error {
-	var formatter output.Formatter
+	// "aggregate" is a special format that groups servers by hardware config.
+	if f.outputFormat == "aggregate" {
+		inv := models.GroupByConfiguration(results, stats)
+		return output.NewAggregatedConsoleFormatter(f.noColor).FormatAggregated(os.Stdout, inv)
+	}
 
+	var formatter output.Formatter
 	switch f.outputFormat {
 	case "json":
 		formatter = output.NewJSONFormatter(true)

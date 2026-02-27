@@ -13,6 +13,9 @@ import (
 	"net/url"
 	"time"
 
+	"sort"
+	"strings"
+
 	"go.uber.org/zap"
 	"idrac-inventory/internal/config"
 	"idrac-inventory/internal/models"
@@ -398,38 +401,19 @@ func (c *Client) buildStorageSummary(drives []models.DriveInfo) string {
 		capacityGroups[capacityGB]++
 	}
 
-	// Build summary string
-	var summary []string
-	// Sort capacities for consistent output
-	var capacities []int
+	// Sort capacities for consistent output.
+	capacities := make([]int, 0, len(capacityGroups))
 	for capacity := range capacityGroups {
 		capacities = append(capacities, capacity)
 	}
+	sort.Ints(capacities)
 
-	// Simple sorting (bubble sort is fine for small arrays)
-	for i := 0; i < len(capacities)-1; i++ {
-		for j := i + 1; j < len(capacities); j++ {
-			if capacities[i] > capacities[j] {
-				capacities[i], capacities[j] = capacities[j], capacities[i]
-			}
-		}
-	}
-
+	summary := make([]string, 0, len(capacities))
 	for _, capacity := range capacities {
-		count := capacityGroups[capacity]
-		summary = append(summary, fmt.Sprintf("%dx%dGB", count, capacity))
+		summary = append(summary, fmt.Sprintf("%dx%dGB", capacityGroups[capacity], capacity))
 	}
 
-	// Join all groups with comma separator
-	result := ""
-	for i, s := range summary {
-		if i > 0 {
-			result += ", "
-		}
-		result += s
-	}
-
-	return result
+	return strings.Join(summary, ", ")
 }
 
 // findDevice searches for a device in NetBox using service tag and serial number.
