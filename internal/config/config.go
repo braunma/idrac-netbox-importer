@@ -207,10 +207,15 @@ func Load(path string) (*Config, error) {
 }
 
 // Parse parses configuration from YAML bytes.
+// Environment variable references in the form ${VAR} or $VAR are expanded
+// before parsing, so values like `username: "${IDRAC_DEFAULT_USER}"` work
+// as expected.
 func Parse(data []byte) (*Config, error) {
 	var cfg Config
 
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	// Expand ${VAR} / $VAR placeholders in the raw YAML before unmarshaling.
+	expanded := os.ExpandEnv(string(data))
+	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 

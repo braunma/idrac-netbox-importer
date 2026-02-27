@@ -251,6 +251,35 @@ servers:
 	assert.Contains(t, err.Error(), "invalid format")
 }
 
+func TestParse_EnvVarExpansionInYAMLValues(t *testing.T) {
+	os.Setenv("MY_IDRAC_USER", "expanded-user")
+	os.Setenv("MY_IDRAC_PASS", "expanded-pass")
+	defer func() {
+		os.Unsetenv("MY_IDRAC_USER")
+		os.Unsetenv("MY_IDRAC_PASS")
+	}()
+
+	yaml := `
+defaults:
+  username: "fallback"
+  password: "fallback"
+
+server_groups:
+  - name: "test-group"
+    ip_ranges:
+      - "192.168.2.32-192.168.2.33"
+    username: "${MY_IDRAC_USER}"
+    password: "${MY_IDRAC_PASS}"
+`
+	cfg, err := Parse([]byte(yaml))
+	require.NoError(t, err)
+	require.Len(t, cfg.Servers, 2)
+
+	// Per-server credentials should be the expanded env-var values, not the literal placeholder.
+	assert.Equal(t, "expanded-user", cfg.Servers[0].GetUsername(cfg.Defaults.Username))
+	assert.Equal(t, "expanded-pass", cfg.Servers[0].GetPassword(cfg.Defaults.Password))
+}
+
 func TestEnvOverrides(t *testing.T) {
 	// Set environment variables
 	os.Setenv("NETBOX_URL", "https://env-netbox.example.com")
