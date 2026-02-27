@@ -41,6 +41,42 @@ INVENTORY_DIR:
   protected: false
 
 # -----------------------------------------------------------------------------
+# Git push-back credentials
+# The scan-and-store job commits updated inventory files back to this repo.
+# GL_TOKEN_WRITE is the recommended method; CI_JOB_TOKEN is the fallback.
+# -----------------------------------------------------------------------------
+
+GL_TOKEN_WRITE:
+  description: >
+    Project access token with write_repository scope used to push inventory
+    commits back to this repository. This is the preferred push-back method
+    and works regardless of CI_JOB_TOKEN push settings.
+    Create at: Settings → Access Tokens → Add token
+                (role: Developer or higher, scope: write_repository)
+    When this variable is absent the pipeline falls back to CI_JOB_TOKEN,
+    which requires "Allow CI Job Token to push" to be enabled at:
+    Settings → CI/CD → Token Access.
+  value: "REPLACE_WITH_YOUR_PROJECT_ACCESS_TOKEN"
+  masked: true
+  protected: false
+
+# -----------------------------------------------------------------------------
+# TLS / CA certificate (for self-signed or private GitLab instances)
+# -----------------------------------------------------------------------------
+
+CA_Chain:
+  description: >
+    PEM-encoded CA certificate chain for your GitLab instance.
+    Set this as a "File" type variable (not "Variable") so that GitLab
+    writes the content to a temporary file and exposes its path via $CA_Chain.
+    Both the git operations and the scanner binary will automatically trust
+    this certificate.
+    Required only when your GitLab is served over a self-signed or private CA.
+  value: "REPLACE_WITH_PEM_CONTENT_OR_USE_FILE_TYPE"
+  masked: false
+  protected: false
+
+# -----------------------------------------------------------------------------
 # iDRAC credentials
 # Mark these as Masked (and Protected for production) in the GitLab UI.
 # -----------------------------------------------------------------------------
@@ -115,9 +151,11 @@ IDRAC_DEFAULT_TIMEOUT:
 # One-time setup: allow CI to push back to this repo
 # =============================================================================
 #
-# The scan-and-store job commits inventory files and pushes them to this repo
-# using CI_JOB_TOKEN.  Enable that in:
-#   Settings → CI/CD → Token Access → "Allow CI Job Token to push to this project"
+# Option A (recommended): Set GL_TOKEN_WRITE to a project access token with
+#   write_repository scope. Works out of the box on any GitLab instance.
 #
-# On self-hosted GitLab instances this is often already permitted by default.
+# Option B (fallback): Enable CI_JOB_TOKEN push access at:
+#   Settings → CI/CD → Token Access → "Allow CI Job Token to push to this project"
+#   On self-hosted GitLab instances this is often already permitted by default.
+#
 # =============================================================================

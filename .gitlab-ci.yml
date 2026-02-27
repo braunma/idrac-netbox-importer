@@ -6,17 +6,33 @@
 # Set these in Settings → CI/CD → Variables, or override them each time you
 # click "Run pipeline" in the GitLab UI.
 #
-#   RUN_TESTS     "true" (default) | "false"
-#                 When "false" the binary is still compiled but the test suite
-#                 is skipped — useful for a quick scan when time is short.
+#   RUN_TESTS       "true" (default) | "false"
+#                   When "false" the binary is still compiled but the test
+#                   suite is skipped — useful for a quick scan when time is
+#                   short.
 #
-#   SYNC_NETBOX   "false" (default) | "true"
-#                 When "true" the scanner also pushes the fresh inventory into
-#                 NetBox. Requires NETBOX_URL + NETBOX_TOKEN to be set.
+#   SYNC_NETBOX     "false" (default) | "true"
+#                   When "true" the scanner also pushes the fresh inventory
+#                   into NetBox. Requires NETBOX_URL + NETBOX_TOKEN to be set.
 #
-#   INVENTORY_DIR "inventory" (default)
-#                 Sub-folder inside *this* repo where the Markdown / JSON
-#                 reports are committed after every scan.
+#   INVENTORY_DIR   "inventory" (default)
+#                   Sub-folder inside *this* repo where the Markdown / JSON
+#                   reports are committed after every scan.
+#
+#   GL_TOKEN_WRITE  Project access token with write_repository scope.
+#                   Preferred method for committing inventory back to this
+#                   repo. When set, this token is used instead of the built-in
+#                   CI_JOB_TOKEN — more reliable across self-hosted GitLab
+#                   instances where job-token push may be restricted.
+#                   Create one at: Settings → Access Tokens → Add token
+#                                  (role: Developer or higher, scope:
+#                                   write_repository)
+#
+#   CA_Chain        PEM-encoded CA certificate chain for your GitLab instance.
+#                   Set this as a "File" type variable in GitLab CI/CD when
+#                   your GitLab is served over a self-signed or private CA.
+#                   Both the git operations and the scanner binary will trust
+#                   this certificate automatically.
 #
 # TYPICAL USAGE
 #   Full run (tests + no NetBox)  →  RUN_TESTS=true,  SYNC_NETBOX=false
@@ -24,9 +40,9 @@
 #   Full run + NetBox             →  RUN_TESTS=true,  SYNC_NETBOX=true
 #
 # PUSH-BACK REQUIREMENT
-#   The scan-and-store job commits inventory files back to this repo using
-#   CI_JOB_TOKEN.  For this to work you must enable project-level CI token
-#   write access:
+#   The scan-and-store job commits inventory files back to this repo.
+#   Recommended: set GL_TOKEN_WRITE (project access token).
+#   Alternative: enable CI_JOB_TOKEN push access at:
 #     Settings → CI/CD → Token Access → "Allow CI Job Token to push"
 #   (On self-hosted GitLab this is often already allowed by default.)
 # =============================================================================
@@ -52,7 +68,20 @@ build:
   stage: build
   image: golang:1.22-alpine
   before_script:
-    - apk add --no-cache git
+    - |
+      echo "==========================================="
+      echo "Job: $CI_JOB_NAME"
+      echo "Pipeline: $CI_PIPELINE_ID"
+      echo "Branch: $CI_COMMIT_REF_NAME"
+      echo "Runner: $CI_RUNNER_DESCRIPTION"
+      echo "==========================================="
+    - apk add --no-cache git ca-certificates
+    - |
+      if [ -n "$CA_Chain" ]; then
+        echo "--- Installing custom CA certificate ---"
+        cp "$CA_Chain" /usr/local/share/ca-certificates/gitlab-custom-ca.crt
+        update-ca-certificates
+      fi
   script:
     - go mod download
     - |
@@ -87,14 +116,39 @@ scan-and-store:
   stage: scan
   image: alpine:3.21
   before_script:
-    - apk add --no-cache git
-    # Allow this job to push commits back to the repo using the CI job token.
-    - git remote set-url origin
-        "https://oauth2:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    - |
+      echo "==========================================="
+      echo "Job: $CI_JOB_NAME"
+      echo "Pipeline: $CI_PIPELINE_ID"
+      echo "Branch: $CI_COMMIT_REF_NAME"
+      echo "Runner: $CI_RUNNER_DESCRIPTION"
+      echo "==========================================="
+    - apk add --no-cache git ca-certificates
+    - |
+      if [ -n "$CA_Chain" ]; then
+        echo "--- Installing custom CA certificate ---"
+        cp "$CA_Chain" /usr/local/share/ca-certificates/gitlab-custom-ca.crt
+        update-ca-certificates
+      fi
+    # Choose push token: GL_TOKEN_WRITE (project access token) is preferred.
+    # Falls back to CI_JOB_TOKEN which requires "Allow CI Job Token to push"
+    # to be enabled in Settings → CI/CD → Token Access.
+    - |
+      if [ -n "$GL_TOKEN_WRITE" ]; then
+        PUSH_TOKEN="$GL_TOKEN_WRITE"
+        echo "--- Using GL_TOKEN_WRITE for git push-back ---"
+      else
+        PUSH_TOKEN="$CI_JOB_TOKEN"
+        echo "--- Using CI_JOB_TOKEN for git push-back ---"
+      fi
+      git remote set-url origin \
+        "https://oauth2:${PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
     # GitLab clones in detached-HEAD mode; switch to an actual branch so that
     # the inventory commit lands on the right ref and can be pushed.
     - git fetch origin "${CI_COMMIT_REF_NAME}"
     - git checkout -B "${CI_COMMIT_REF_NAME}" "origin/${CI_COMMIT_REF_NAME}"
+    - git config user.email "ci-bot@${CI_SERVER_HOST}"
+    - git config user.name "GitLab CI"
   script:
     - chmod +x ./idrac-inventory
     - |
