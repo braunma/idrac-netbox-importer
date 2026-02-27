@@ -19,6 +19,7 @@ import (
 // Config is the root configuration structure.
 type Config struct {
 	NetBox       NetBoxConfig   `yaml:"netbox"`
+	GitLab       GitLabConfig   `yaml:"gitlab"`
 	Servers      []ServerConfig `yaml:"servers"`
 	ServerGroups []ServerGroup  `yaml:"server_groups,omitempty"`
 	Defaults     DefaultsConfig `yaml:"defaults"`
@@ -26,6 +27,34 @@ type Config struct {
 	Logging      LoggingConfig  `yaml:"logging"`
 	Retry        RetryConfig    `yaml:"retry"`
 	HTTP         HTTPConfig     `yaml:"http"`
+}
+
+// GitLabConfig holds configuration for exporting inventory reports to a local
+// git repository that is connected to a GitLab instance.
+type GitLabConfig struct {
+	// RepoPath is the absolute path to the local git repository.
+	RepoPath string `yaml:"repo_path"`
+
+	// Branch is the git branch to commit to (default: "main").
+	Branch string `yaml:"branch"`
+
+	// InventoryDir is the sub-directory within the repo where files are written
+	// (default: "inventory").
+	InventoryDir string `yaml:"inventory_dir"`
+
+	// AuthorName is used for the git commit author (default: "iDRAC Inventory Bot").
+	AuthorName string `yaml:"author_name"`
+
+	// AuthorEmail is used for the git commit author (default: "idrac-inventory@localhost").
+	AuthorEmail string `yaml:"author_email"`
+
+	// Push controls whether to push to the remote after committing.
+	Push bool `yaml:"push"`
+}
+
+// IsEnabled returns true if GitLab export is configured.
+func (g GitLabConfig) IsEnabled() bool {
+	return g.RepoPath != ""
 }
 
 // ServerGroup holds configuration for a group of servers with IP ranges.
