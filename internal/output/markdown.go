@@ -54,6 +54,17 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 					ramCol += fmt.Sprintf(" @ %s MHz", formatWithCommas(fp.RAMSpeedMHz))
 				}
 			}
+			if fp.RAMModuleSizeGiB > 0 {
+				moduleCount := 0
+				if len(mg.ConfigGroups[0].Servers) > 0 {
+					moduleCount = mg.ConfigGroups[0].Servers[0].MemorySlotsUsed
+				}
+				if moduleCount > 0 {
+					ramCol += fmt.Sprintf(" (%d× %d GiB)", moduleCount, fp.RAMModuleSizeGiB)
+				} else {
+					ramCol += fmt.Sprintf(" (%d GiB/module)", fp.RAMModuleSizeGiB)
+				}
+			}
 			if fp.RAMSlotsTotal > 0 && len(mg.ConfigGroups[0].Servers) > 0 {
 				s := mg.ConfigGroups[0].Servers[0]
 				ramSlotsCol = fmt.Sprintf("%d/%d (%d free)", s.MemorySlotsUsed, fp.RAMSlotsTotal, s.MemorySlotsFree)
@@ -65,7 +76,7 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 		}
 		fmt.Fprintf(w, "| [%d](#model-%d) | **%d** | %s | %d | %s | %s | %s | %s |\n",
 			i+1, i+1,
-			mg.TotalCount, mg.DisplayModel(),
+			mg.TotalCount, mg.Model,
 			len(mg.ConfigGroups),
 			cpuCol, ramCol, ramSlotsCol, storageCol,
 		)
