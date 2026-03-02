@@ -124,12 +124,26 @@ type Processor struct {
 	TotalEnabledCores     int    `json:"TotalEnabledCores"`
 	TotalThreads          int    `json:"TotalThreads"`
 
+	// GPU/Accelerator memory (VRAM) - inline array in the Processor resource
+	ProcessorMemory []ProcessorMemory `json:"ProcessorMemory,omitempty"`
+
 	Status Status `json:"Status"`
 }
 
 // IsInstalled returns true if the processor is present and enabled.
 func (p *Processor) IsInstalled() bool {
 	return p.Status.State == StateEnabled
+}
+
+// IsGPU returns true if this processor is a GPU or accelerator.
+func (p *Processor) IsGPU() bool {
+	return p.ProcessorType == "Accelerator" || p.ProcessorType == "GPU"
+}
+
+// ProcessorMemory represents memory (VRAM) attached to a processor or GPU accelerator.
+type ProcessorMemory struct {
+	MemoryType  string `json:"MemoryType"`
+	CapacityMiB int    `json:"CapacityMiB"`
 }
 
 // Memory represents a Redfish Memory (DIMM) resource.

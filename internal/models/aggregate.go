@@ -23,15 +23,20 @@ type HardwareFingerprint struct {
 	RAMSpeedMHz       int    `json:"ram_speed_mhz"`
 	RAMSlotsTotal     int    `json:"ram_slots_total"`
 	StorageSummary    string `json:"storage_summary"` // e.g. "2×745GB SSD, 4×14306GB HDD"
+	// GPU / Accelerator ("Beschleuniger" in German iDRAC)
+	GPUCount    int    `json:"gpu_count"`
+	GPUModel    string `json:"gpu_model"`    // model of the first GPU (all assumed identical)
+	GPUMemoryGiB int   `json:"gpu_memory_gib"` // VRAM per GPU in GiB
 }
 
 // Key returns a stable string key suitable for use in a map.
 func (f HardwareFingerprint) Key() string {
-	return fmt.Sprintf("%s|%s|%d|%s|%d|%d|%d|%s|%d|%d|%s",
+	return fmt.Sprintf("%s|%s|%d|%s|%d|%d|%d|%s|%d|%d|%s|%d|%s|%d",
 		f.Manufacturer, f.Model,
 		f.CPUCount, f.CPUModel, f.CPUCoresPerSocket, f.CPUSpeedMHz,
 		f.RAMTotalGiB, f.RAMType, f.RAMSpeedMHz, f.RAMSlotsTotal,
 		f.StorageSummary,
+		f.GPUCount, f.GPUModel, f.GPUMemoryGiB,
 	)
 }
 
@@ -111,13 +116,14 @@ func GroupByConfiguration(servers []ServerInfo, stats CollectionStats) Aggregate
 // buildFingerprint derives a HardwareFingerprint from a successfully scanned server.
 func buildFingerprint(s ServerInfo) HardwareFingerprint {
 	fp := HardwareFingerprint{
-		Manufacturer:  s.Manufacturer,
-		Model:         s.Model,
-		CPUCount:      s.CPUCount,
-		CPUModel:      s.CPUModel,
-		RAMTotalGiB:   int(s.TotalMemoryGiB + 0.5), // round to nearest GiB
-		RAMSlotsTotal: s.MemorySlotsTotal,
+		Manufacturer:   s.Manufacturer,
+		Model:          s.Model,
+		CPUCount:       s.CPUCount,
+		CPUModel:       s.CPUModel,
+		RAMTotalGiB:    int(s.TotalMemoryGiB + 0.5), // round to nearest GiB
+		RAMSlotsTotal:  s.MemorySlotsTotal,
 		StorageSummary: NormalizeStorageSummary(s.Drives),
+		GPUCount:       s.GPUCount,
 	}
 
 	// Pull per-socket CPU details from the first populated CPU socket.
@@ -139,6 +145,12 @@ func buildFingerprint(s ServerInfo) HardwareFingerprint {
 			fp.RAMSpeedMHz = mem.SpeedMHz
 			break
 		}
+	}
+
+	// Pull GPU model and VRAM from the first GPU (assumes homogeneous GPU config).
+	if len(s.GPUs) > 0 {
+		fp.GPUModel = s.GPUs[0].Model
+		fp.GPUMemoryGiB = int(s.GPUs[0].MemoryGB() + 0.5) // round to nearest GiB
 	}
 
 	return fp

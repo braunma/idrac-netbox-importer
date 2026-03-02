@@ -270,6 +270,7 @@ func (s *Scanner) scanServer(ctx context.Context, server config.ServerConfig) mo
 		"serial_number", info.SerialNumber,
 		"service_tag", info.ServiceTag,
 		"cpus", info.CPUCount,
+		"gpus", info.GPUCount,
 		"ram_gb", info.TotalMemoryGiB,
 		"drives", info.DriveCount,
 	)
@@ -360,7 +361,7 @@ func (s *Scanner) collectSystemInfo(ctx context.Context, client *redfishClient, 
 	return nil
 }
 
-// collectProcessors retrieves detailed processor information.
+// collectProcessors retrieves detailed processor information, including GPUs/accelerators.
 func (s *Scanner) collectProcessors(ctx context.Context, client *redfishClient, info *models.ServerInfo) error {
 	// Get processor collection
 	var collection redfish.Collection
@@ -368,8 +369,10 @@ func (s *Scanner) collectProcessors(ctx context.Context, client *redfishClient, 
 		return errors.NewCollectionError(info.Host, "processors", err)
 	}
 
-	// Fetch each processor
+	// Fetch each processor and classify as CPU or GPU/accelerator
 	var cpus []models.CPUInfo
+	var gpus []models.GPUInfo
+
 	for _, member := range collection.Members {
 		var processor redfish.Processor
 		if err := client.get(ctx, member.OdataID, &processor); err != nil {
@@ -386,31 +389,48 @@ func (s *Scanner) collectProcessors(ctx context.Context, client *redfishClient, 
 			continue
 		}
 
-		// Derive CPU brand from manufacturer and model
-		brand := processor.Model
-		if processor.Manufacturer != "" && processor.Model != "" {
-			brand = processor.Manufacturer + " " + processor.Model
-		}
+		if processor.IsGPU() {
+			// Collect as GPU/accelerator ("Beschleuniger" in German iDRAC)
+			gpu := s.buildGPUInfo(processor)
+			gpus = append(gpus, gpu)
 
-		cpu := models.CPUInfo{
-			Socket:            processor.Socket,
-			Model:             processor.Model,
-			Manufacturer:      processor.Manufacturer,
-			Brand:             brand,
-			Cores:             processor.TotalCores,
-			Threads:           processor.TotalThreads,
-			MaxSpeedMHz:       processor.MaxSpeedMHz,
-			OperatingSpeedMHz: processor.OperatingSpeedMHz,
-			ProcessorType:     processor.ProcessorType,
-			Architecture:      processor.ProcessorArchitecture,
-			InstructionSet:    processor.InstructionSet,
-			Health:            processor.Status.Health,
-		}
+			s.logger.Infow("GPU/accelerator details",
+				"host", info.Host,
+				"slot", gpu.Slot,
+				"model", gpu.Model,
+				"manufacturer", gpu.Manufacturer,
+				"memory_mib", gpu.MemoryMiB,
+				"memory_type", gpu.MemoryType,
+				"health", gpu.Health,
+			)
+		} else {
+			// Collect as standard CPU
+			brand := processor.Model
+			if processor.Manufacturer != "" && processor.Model != "" {
+				brand = processor.Manufacturer + " " + processor.Model
+			}
 
-		cpus = append(cpus, cpu)
+			cpu := models.CPUInfo{
+				Socket:            processor.Socket,
+				Model:             processor.Model,
+				Manufacturer:      processor.Manufacturer,
+				Brand:             brand,
+				Cores:             processor.TotalCores,
+				Threads:           processor.TotalThreads,
+				MaxSpeedMHz:       processor.MaxSpeedMHz,
+				OperatingSpeedMHz: processor.OperatingSpeedMHz,
+				ProcessorType:     processor.ProcessorType,
+				Architecture:      processor.ProcessorArchitecture,
+				InstructionSet:    processor.InstructionSet,
+				Health:            processor.Status.Health,
+			}
+			cpus = append(cpus, cpu)
+		}
 	}
 
 	info.CPUs = cpus
+	info.GPUs = gpus
+	info.GPUCount = len(gpus)
 
 	// Update count from actual installed CPUs if different from summary
 	if len(cpus) > 0 {
@@ -420,7 +440,6 @@ func (s *Scanner) collectProcessors(ctx context.Context, client *redfishClient, 
 			info.CPUModel = cpus[0].Model
 		}
 
-		// Log extracted CPU information
 		s.logger.Infow("extracted CPU information",
 			"host", info.Host,
 			"cpu_count", len(cpus),
@@ -442,7 +461,41 @@ func (s *Scanner) collectProcessors(ctx context.Context, client *redfishClient, 
 		}
 	}
 
+	if len(gpus) > 0 {
+		s.logger.Infow("extracted GPU/accelerator information",
+			"host", info.Host,
+			"gpu_count", len(gpus),
+		)
+	}
+
 	return nil
+}
+
+// buildGPUInfo constructs a GPUInfo model from a Redfish Processor entry typed as GPU/Accelerator.
+func (s *Scanner) buildGPUInfo(processor redfish.Processor) models.GPUInfo {
+	gpu := models.GPUInfo{
+		Slot:         processor.Socket,
+		Model:        processor.Model,
+		Manufacturer: processor.Manufacturer,
+		Health:       processor.Status.Health,
+	}
+
+	// Use Name as Slot identifier if Socket is empty (common for GPU entries)
+	if gpu.Slot == "" {
+		gpu.Slot = processor.Name
+	}
+
+	// Extract VRAM from inline ProcessorMemory array
+	for _, mem := range processor.ProcessorMemory {
+		if mem.CapacityMiB > 0 {
+			gpu.MemoryMiB += mem.CapacityMiB
+			if gpu.MemoryType == "" {
+				gpu.MemoryType = mem.MemoryType
+			}
+		}
+	}
+
+	return gpu
 }
 
 // collectMemory retrieves detailed memory module information.
