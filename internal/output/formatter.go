@@ -72,7 +72,7 @@ func (f *ConsoleFormatter) formatServer(w io.Writer, info models.ServerInfo) {
 
 	// System Information
 	fmt.Fprintf(w, "\n%s System Information:\n", f.icon("📋"))
-	fmt.Fprintf(w, "   %-14s %s %s\n", "Model:", info.Manufacturer, info.Model)
+	fmt.Fprintf(w, "   %-14s %s\n", "Model:", info.Model)
 	fmt.Fprintf(w, "   %-14s %s\n", "Service Tag:", f.valueOrNA(info.ServiceTag))
 	fmt.Fprintf(w, "   %-14s %s\n", "Serial:", f.valueOrNA(info.SerialNumber))
 	fmt.Fprintf(w, "   %-14s %s\n", "BIOS:", f.valueOrNA(info.BiosVersion))
@@ -299,7 +299,7 @@ func (f *TableFormatter) Format(w io.Writer, results []models.ServerInfo, stats 
 			status = "ERROR"
 		}
 
-		ramSlots := fmt.Sprintf("%d/%d", info.MemorySlotsUsed, info.MemorySlotsTotal)
+		ramSlots := fmt.Sprintf("%d/%d (%d free)", info.MemorySlotsUsed, info.MemorySlotsTotal, info.MemorySlotsFree)
 		power := ""
 		if info.PowerConsumedWatts > 0 {
 			power = fmt.Sprintf("%d", info.PowerConsumedWatts)
