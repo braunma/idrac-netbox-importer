@@ -96,7 +96,19 @@ func (f *ConsoleFormatter) formatServer(w io.Writer, info models.ServerInfo) {
 	}
 
 	// Memory
-	fmt.Fprintf(w, "\n%s Memory: %.0f GiB total\n", f.icon("💾"), info.TotalMemoryGiB)
+	memoryLine := fmt.Sprintf("%.0f GiB total", info.TotalMemoryGiB)
+	for _, mem := range info.Memory {
+		if mem.IsPopulated() {
+			moduleGiB := int(mem.CapacityGB() + 0.5)
+			if mem.Type != "" {
+				memoryLine += fmt.Sprintf("  (%d× %d GiB %s)", info.MemorySlotsUsed, moduleGiB, mem.Type)
+			} else {
+				memoryLine += fmt.Sprintf("  (%d× %d GiB)", info.MemorySlotsUsed, moduleGiB)
+			}
+			break
+		}
+	}
+	fmt.Fprintf(w, "\n%s Memory: %s\n", f.icon("💾"), memoryLine)
 	fmt.Fprintf(w, "   └─ Slots: %d/%d used (%d free)\n",
 		info.MemorySlotsUsed, info.MemorySlotsTotal, info.MemorySlotsFree)
 

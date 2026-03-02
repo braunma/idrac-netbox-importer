@@ -153,6 +153,17 @@ func (f *MarkdownFormatter) writeConfigGroup(w io.Writer, idx int, group models.
 			ramLine += fmt.Sprintf(" @ %s MHz", formatWithCommas(fp.RAMSpeedMHz))
 		}
 	}
+	if fp.RAMModuleSizeGiB > 0 {
+		moduleCount := 0
+		if len(group.Servers) > 0 {
+			moduleCount = group.Servers[0].MemorySlotsUsed
+		}
+		if moduleCount > 0 {
+			ramLine += fmt.Sprintf(" (%d× %d GiB modules)", moduleCount, fp.RAMModuleSizeGiB)
+		} else {
+			ramLine += fmt.Sprintf(" (%d GiB/module)", fp.RAMModuleSizeGiB)
+		}
+	}
 	fmt.Fprintf(w, "| **RAM** | %s |\n", ramLine)
 	if fp.RAMSlotsTotal > 0 && len(group.Servers) > 0 {
 		s := group.Servers[0]

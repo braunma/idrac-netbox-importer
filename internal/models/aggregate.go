@@ -19,6 +19,7 @@ type HardwareFingerprint struct {
 	CPUCoresPerSocket int    `json:"cpu_cores_per_socket"`
 	CPUSpeedMHz       int    `json:"cpu_speed_mhz"`
 	RAMTotalGiB       int    `json:"ram_total_gib"`
+	RAMModuleSizeGiB  int    `json:"ram_module_size_gib"` // size of a single DIMM in GiB
 	RAMType           string `json:"ram_type"`
 	RAMSpeedMHz       int    `json:"ram_speed_mhz"`
 	RAMSlotsTotal     int    `json:"ram_slots_total"`
@@ -32,9 +33,9 @@ type HardwareFingerprint struct {
 // Key returns a stable string key for hardware config (excludes manufacturer/model —
 // those are the model-group key). Used as the config-subgroup discriminator.
 func (f HardwareFingerprint) Key() string {
-	return fmt.Sprintf("%d|%s|%d|%d|%d|%s|%d|%d|%s|%d|%s|%d",
+	return fmt.Sprintf("%d|%s|%d|%d|%d|%d|%s|%d|%d|%s|%d|%s|%d",
 		f.CPUCount, f.CPUModel, f.CPUCoresPerSocket, f.CPUSpeedMHz,
-		f.RAMTotalGiB, f.RAMType, f.RAMSpeedMHz, f.RAMSlotsTotal,
+		f.RAMTotalGiB, f.RAMModuleSizeGiB, f.RAMType, f.RAMSpeedMHz, f.RAMSlotsTotal,
 		f.StorageSummary,
 		f.GPUCount, f.GPUModel, f.GPUMemoryGiB,
 	)
@@ -193,11 +194,12 @@ func buildFingerprint(s ServerInfo) HardwareFingerprint {
 		}
 	}
 
-	// Pull memory type/speed from the first populated DIMM.
+	// Pull memory type/speed/module-size from the first populated DIMM.
 	for _, mem := range s.Memory {
 		if mem.IsPopulated() {
 			fp.RAMType = mem.Type
 			fp.RAMSpeedMHz = mem.SpeedMHz
+			fp.RAMModuleSizeGiB = (mem.CapacityMiB + 512) / 1024 // round to nearest GiB
 			break
 		}
 	}
