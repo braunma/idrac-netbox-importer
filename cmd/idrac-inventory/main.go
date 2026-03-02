@@ -274,7 +274,7 @@ func runGitLabExport(f *flags, cfg *config.Config, results []models.ServerInfo, 
 		"repo", repoPath,
 		"branch", branch,
 		"dir", dir,
-		"groups", len(inv.Groups),
+		"models", len(inv.ModelGroups),
 		"total_servers", inv.TotalServers,
 	)
 

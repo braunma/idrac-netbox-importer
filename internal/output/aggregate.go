@@ -10,8 +10,7 @@ import (
 )
 
 // AggregatedConsoleFormatter prints an aggregated hardware inventory to the terminal.
-// Servers with identical hardware configurations are shown as a single group
-// with a count, making it easy to spot e.g. "12× Dell R440 with the same spec".
+// Servers are first grouped by model, then by hardware configuration within each model.
 type AggregatedConsoleFormatter struct {
 	NoColor bool
 }
@@ -26,14 +25,16 @@ func (f *AggregatedConsoleFormatter) FormatAggregated(w io.Writer, inv models.Ag
 	const width = 80
 	line := strings.Repeat("═", width)
 	thin := strings.Repeat("─", width)
+	dotted := strings.Repeat("·", width)
 
 	// Header
 	fmt.Fprintf(w, "\n%s\n", line)
 	fmt.Fprintf(w, "  HARDWARE INVENTORY REPORT\n")
 	fmt.Fprintf(w, "  Generated: %s\n", inv.GeneratedAt.Format("2006-01-02 15:04:05 UTC"))
 	fmt.Fprintf(w, "%s\n", line)
-	fmt.Fprintf(w, "  Total: %d servers  |  Success: %d  |  Failed: %d  |  Config groups: %d\n",
-		inv.TotalServers, inv.SuccessfulCount, inv.FailedCount, len(inv.Groups))
+	fmt.Fprintf(w, "  Total: %d servers  |  Success: %d  |  Failed: %d  |  Models: %d  |  Config groups: %d\n",
+		inv.TotalServers, inv.SuccessfulCount, inv.FailedCount,
+		len(inv.ModelGroups), inv.TotalConfigGroups())
 	if inv.Stats.TotalDuration > 0 {
 		fmt.Fprintf(w, "  Scan time: %s total  |  avg %s/server\n",
 			inv.Stats.TotalDuration.Round(time.Millisecond),
@@ -41,75 +42,103 @@ func (f *AggregatedConsoleFormatter) FormatAggregated(w io.Writer, inv models.Ag
 	}
 	fmt.Fprintf(w, "\n")
 
-	// Groups
-	for i, group := range inv.Groups {
-		fp := group.Fingerprint
+	// Model groups
+	for i, mg := range inv.ModelGroups {
 		fmt.Fprintf(w, "%s\n", thin)
-		fmt.Fprintf(w, "  GROUP %d — %s%d× %s%s\n",
+		fmt.Fprintf(w, "  MODEL %d — %s%d× %s%s\n",
 			i+1,
-			f.bold(), group.Count, fp.DisplayModel(), f.reset())
+			f.bold(), mg.TotalCount, mg.DisplayModel(), f.reset())
 		fmt.Fprintf(w, "%s\n", thin)
 
-		// CPU line
-		cpuSpec := ""
-		if fp.CPUModel != "" {
-			cpuSpec = fmt.Sprintf("%d× %s", fp.CPUCount, fp.CPUModel)
-		} else {
-			cpuSpec = fmt.Sprintf("%d sockets", fp.CPUCount)
-		}
-		fmt.Fprintf(w, "  %-15s %s\n", "CPUs:", cpuSpec)
+		for j, cg := range mg.ConfigGroups {
+			fp := cg.Fingerprint
 
-		if fp.CPUCoresPerSocket > 0 {
-			totalCores := fp.CPUCoresPerSocket * fp.CPUCount
-			speedStr := ""
-			if fp.CPUSpeedMHz > 0 {
-				speedStr = fmt.Sprintf("  @  %.2f GHz", float64(fp.CPUSpeedMHz)/1000)
+			// If there is more than one config subgroup, label each one.
+			if len(mg.ConfigGroups) > 1 {
+				fmt.Fprintf(w, "\n  %sConfiguration %d/%d%s  (%d server",
+					f.bold(), j+1, len(mg.ConfigGroups), f.reset(), cg.Count)
+				if cg.Count != 1 {
+					fmt.Fprintf(w, "s")
+				}
+				fmt.Fprintf(w, ")\n")
+				fmt.Fprintf(w, "  %s\n", dotted[:60])
+			} else {
+				fmt.Fprintf(w, "\n")
 			}
-			fmt.Fprintf(w, "  %-15s %d cores/CPU (%d total)%s\n",
-				"CPU Cores:", fp.CPUCoresPerSocket, totalCores, speedStr)
-		}
 
-		// RAM line
-		ramSpec := fmt.Sprintf("%d GiB", fp.RAMTotalGiB)
-		if fp.RAMType != "" {
-			ramSpec += "  " + fp.RAMType
-			if fp.RAMSpeedMHz > 0 {
-				ramSpec += fmt.Sprintf(" @ %d MHz", fp.RAMSpeedMHz)
+			// CPU line
+			cpuSpec := ""
+			if fp.CPUModel != "" {
+				cpuSpec = fmt.Sprintf("%d× %s", fp.CPUCount, fp.CPUModel)
+			} else {
+				cpuSpec = fmt.Sprintf("%d sockets", fp.CPUCount)
 			}
-		}
-		fmt.Fprintf(w, "  %-15s %s\n", "RAM:", ramSpec)
+			fmt.Fprintf(w, "  %-15s %s\n", "CPUs:", cpuSpec)
 
-		if fp.RAMSlotsTotal > 0 && len(group.Servers) > 0 {
-			s := group.Servers[0]
-			fmt.Fprintf(w, "  %-15s %d total  /  %d used  /  %d free\n",
-				"RAM Slots:", fp.RAMSlotsTotal, s.MemorySlotsUsed, s.MemorySlotsFree)
-		}
+			if fp.CPUCoresPerSocket > 0 {
+				totalCores := fp.CPUCoresPerSocket * fp.CPUCount
+				speedStr := ""
+				if fp.CPUSpeedMHz > 0 {
+					speedStr = fmt.Sprintf("  @  %.2f GHz", float64(fp.CPUSpeedMHz)/1000)
+				}
+				fmt.Fprintf(w, "  %-15s %d cores/CPU (%d total)%s\n",
+					"CPU Cores:", fp.CPUCoresPerSocket, totalCores, speedStr)
+			}
 
-		// Storage
-		storageSpec := fp.StorageSummary
-		if group.TotalStorageTB > 0 {
-			storageSpec += fmt.Sprintf("  (%.2f TB total)", group.TotalStorageTB)
-		}
-		fmt.Fprintf(w, "  %-15s %s\n", "Storage:", storageSpec)
+			// RAM line
+			ramSpec := fmt.Sprintf("%d GiB", fp.RAMTotalGiB)
+			if fp.RAMType != "" {
+				ramSpec += "  " + fp.RAMType
+				if fp.RAMSpeedMHz > 0 {
+					ramSpec += fmt.Sprintf(" @ %d MHz", fp.RAMSpeedMHz)
+				}
+			}
+			fmt.Fprintf(w, "  %-15s %s\n", "RAM:", ramSpec)
 
-		// Server list
-		fmt.Fprintf(w, "\n  Servers (%d):\n", group.Count)
-		fmt.Fprintf(w, "    %-18s %-22s %-14s %s\n", "IP Address", "Hostname", "Service Tag", "Power")
-		fmt.Fprintf(w, "    %s\n", strings.Repeat("-", 64))
-		for _, srv := range group.Servers {
-			hostname := srv.HostName
-			if hostname == "" {
-				hostname = srv.Name
+			if fp.RAMSlotsTotal > 0 && len(cg.Servers) > 0 {
+				s := cg.Servers[0]
+				fmt.Fprintf(w, "  %-15s %d total  /  %d used  /  %d free\n",
+					"RAM Slots:", fp.RAMSlotsTotal, s.MemorySlotsUsed, s.MemorySlotsFree)
 			}
-			if hostname == "" {
-				hostname = "-"
+
+			// GPU line
+			if fp.GPUCount > 0 {
+				gpuSpec := fmt.Sprintf("%d×", fp.GPUCount)
+				if fp.GPUModel != "" {
+					gpuSpec += " " + fp.GPUModel
+				}
+				if fp.GPUMemoryGiB > 0 {
+					gpuSpec += fmt.Sprintf(" (%d GB VRAM each)", fp.GPUMemoryGiB)
+				}
+				fmt.Fprintf(w, "  %-15s %s\n", "GPUs:", gpuSpec)
 			}
-			serviceTag := srv.ServiceTag
-			if serviceTag == "" {
-				serviceTag = "-"
+
+			// Storage
+			storageSpec := fp.StorageSummary
+			if cg.TotalStorageTB > 0 {
+				storageSpec += fmt.Sprintf("  (%.2f TB total)", cg.TotalStorageTB)
 			}
-			fmt.Fprintf(w, "    %-18s %-22s %-14s %s\n",
-				srv.Host, hostname, serviceTag, srv.PowerState)
+			fmt.Fprintf(w, "  %-15s %s\n", "Storage:", storageSpec)
+
+			// Server list
+			fmt.Fprintf(w, "\n  Servers (%d):\n", cg.Count)
+			fmt.Fprintf(w, "    %-18s %-22s %-14s %s\n", "IP Address", "Hostname", "Service Tag", "Power")
+			fmt.Fprintf(w, "    %s\n", strings.Repeat("-", 64))
+			for _, srv := range cg.Servers {
+				hostname := srv.HostName
+				if hostname == "" {
+					hostname = srv.Name
+				}
+				if hostname == "" {
+					hostname = "-"
+				}
+				serviceTag := srv.ServiceTag
+				if serviceTag == "" {
+					serviceTag = "-"
+				}
+				fmt.Fprintf(w, "    %-18s %-22s %-14s %s\n",
+					srv.Host, hostname, serviceTag, srv.PowerState)
+			}
 		}
 		fmt.Fprintf(w, "\n")
 	}

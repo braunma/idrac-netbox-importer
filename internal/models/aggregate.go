@@ -24,15 +24,15 @@ type HardwareFingerprint struct {
 	RAMSlotsTotal     int    `json:"ram_slots_total"`
 	StorageSummary    string `json:"storage_summary"` // e.g. "2×745GB SSD, 4×14306GB HDD"
 	// GPU / Accelerator ("Beschleuniger" in German iDRAC)
-	GPUCount    int    `json:"gpu_count"`
-	GPUModel    string `json:"gpu_model"`    // model of the first GPU (all assumed identical)
-	GPUMemoryGiB int   `json:"gpu_memory_gib"` // VRAM per GPU in GiB
+	GPUCount     int    `json:"gpu_count"`
+	GPUModel     string `json:"gpu_model"`     // model of the first GPU (all assumed identical)
+	GPUMemoryGiB int    `json:"gpu_memory_gib"` // VRAM per GPU in GiB
 }
 
-// Key returns a stable string key suitable for use in a map.
+// Key returns a stable string key for hardware config (excludes manufacturer/model —
+// those are the model-group key). Used as the config-subgroup discriminator.
 func (f HardwareFingerprint) Key() string {
-	return fmt.Sprintf("%s|%s|%d|%s|%d|%d|%d|%s|%d|%d|%s|%d|%s|%d",
-		f.Manufacturer, f.Model,
+	return fmt.Sprintf("%d|%s|%d|%d|%d|%s|%d|%d|%s|%d|%s|%d",
 		f.CPUCount, f.CPUModel, f.CPUCoresPerSocket, f.CPUSpeedMHz,
 		f.RAMTotalGiB, f.RAMType, f.RAMSpeedMHz, f.RAMSlotsTotal,
 		f.StorageSummary,
@@ -40,15 +40,8 @@ func (f HardwareFingerprint) Key() string {
 	)
 }
 
-// DisplayModel returns a human-friendly model string including manufacturer.
-func (f HardwareFingerprint) DisplayModel() string {
-	if f.Manufacturer != "" && !strings.HasPrefix(strings.ToLower(f.Model), strings.ToLower(f.Manufacturer)) {
-		return f.Manufacturer + " " + f.Model
-	}
-	return f.Model
-}
-
-// HardwareGroup represents a set of servers that share identical hardware configuration.
+// HardwareGroup represents a set of servers that share identical hardware configuration
+// within a model group.
 type HardwareGroup struct {
 	Fingerprint    HardwareFingerprint `json:"fingerprint"`
 	Count          int                 `json:"count"`
@@ -56,19 +49,52 @@ type HardwareGroup struct {
 	TotalStorageTB float64             `json:"total_storage_tb,omitempty"` // from first server
 }
 
-// AggregatedInventory is the top-level structure for the aggregated hardware report.
-type AggregatedInventory struct {
-	GeneratedAt    time.Time       `json:"generated_at"`
-	TotalServers   int             `json:"total_servers"`
-	SuccessfulCount int            `json:"successful_count"`
-	FailedCount    int             `json:"failed_count"`
-	Groups         []HardwareGroup `json:"groups"`
-	FailedServers  []ServerInfo    `json:"failed_servers,omitempty"`
-	Stats          CollectionStats `json:"stats"`
+// ModelGroup represents all servers of a specific hardware model (e.g. "Dell PowerEdge R440").
+// Servers with different hardware configurations within the same model appear as separate
+// ConfigGroups, making it easy to spot e.g. "50× R440: 45 with config A, 5 with config B".
+type ModelGroup struct {
+	Manufacturer string         `json:"manufacturer"`
+	Model        string         `json:"model"`
+	TotalCount   int            `json:"total_count"`
+	ConfigGroups []HardwareGroup `json:"config_groups"`
 }
 
-// GroupByConfiguration groups servers that share the same hardware configuration.
-// Failed servers are collected separately. Groups are sorted by count (descending).
+// DisplayModel returns a human-friendly model string including manufacturer.
+func (g ModelGroup) DisplayModel() string {
+	if g.Manufacturer != "" && !strings.HasPrefix(strings.ToLower(g.Model), strings.ToLower(g.Manufacturer)) {
+		return g.Manufacturer + " " + g.Model
+	}
+	return g.Model
+}
+
+// AggregatedInventory is the top-level structure for the aggregated hardware report.
+type AggregatedInventory struct {
+	GeneratedAt     time.Time     `json:"generated_at"`
+	TotalServers    int           `json:"total_servers"`
+	SuccessfulCount int           `json:"successful_count"`
+	FailedCount     int           `json:"failed_count"`
+	ModelGroups     []ModelGroup  `json:"model_groups"`
+	FailedServers   []ServerInfo  `json:"failed_servers,omitempty"`
+	Stats           CollectionStats `json:"stats"`
+}
+
+// TotalConfigGroups returns the total number of distinct hardware-config sub-groups
+// across all model groups.
+func (inv AggregatedInventory) TotalConfigGroups() int {
+	total := 0
+	for _, mg := range inv.ModelGroups {
+		total += len(mg.ConfigGroups)
+	}
+	return total
+}
+
+// GroupByConfiguration groups servers using a two-level hierarchy:
+//  1. Model group — all servers of the same Manufacturer+Model
+//  2. Config subgroup — servers within a model that share the same hardware config
+//
+// Failed servers are collected separately.
+// Model groups are sorted by total count (descending); config subgroups within each model
+// are also sorted by count (descending).
 func GroupByConfiguration(servers []ServerInfo, stats CollectionStats) AggregatedInventory {
 	inv := AggregatedInventory{
 		GeneratedAt:  time.Now().UTC(),
@@ -76,8 +102,15 @@ func GroupByConfiguration(servers []ServerInfo, stats CollectionStats) Aggregate
 		Stats:        stats,
 	}
 
-	groupMap := make(map[string]*HardwareGroup)
-	var groupOrder []string
+	type modelKey struct {
+		manufacturer string
+		model        string
+	}
+
+	modelMap := make(map[modelKey]*ModelGroup)
+	// configIdxMap maps "manufacturer|model\x00fpKey" → index in ModelGroup.ConfigGroups.
+	configIdxMap := make(map[string]int)
+	var modelOrder []modelKey
 
 	for _, srv := range servers {
 		if srv.Error != nil {
@@ -87,28 +120,50 @@ func GroupByConfiguration(servers []ServerInfo, stats CollectionStats) Aggregate
 		}
 
 		inv.SuccessfulCount++
-		fp := buildFingerprint(srv)
-		key := fp.Key()
 
-		if _, exists := groupMap[key]; !exists {
-			groupMap[key] = &HardwareGroup{
-				Fingerprint:    fp,
-				TotalStorageTB: srv.TotalStorageTB,
+		mk := modelKey{manufacturer: srv.Manufacturer, model: srv.Model}
+		if _, exists := modelMap[mk]; !exists {
+			modelMap[mk] = &ModelGroup{
+				Manufacturer: srv.Manufacturer,
+				Model:        srv.Model,
 			}
-			groupOrder = append(groupOrder, key)
+			modelOrder = append(modelOrder, mk)
 		}
-		groupMap[key].Servers = append(groupMap[key].Servers, srv)
-		groupMap[key].Count++
+		mg := modelMap[mk]
+		mg.TotalCount++
+
+		fp := buildFingerprint(srv)
+		combKey := fmt.Sprintf("%s|%s\x00%s", mk.manufacturer, mk.model, fp.Key())
+
+		if idx, exists := configIdxMap[combKey]; exists {
+			mg.ConfigGroups[idx].Servers = append(mg.ConfigGroups[idx].Servers, srv)
+			mg.ConfigGroups[idx].Count++
+		} else {
+			configIdxMap[combKey] = len(mg.ConfigGroups)
+			mg.ConfigGroups = append(mg.ConfigGroups, HardwareGroup{
+				Fingerprint:    fp,
+				Count:          1,
+				Servers:        []ServerInfo{srv},
+				TotalStorageTB: srv.TotalStorageTB,
+			})
+		}
 	}
 
-	for _, key := range groupOrder {
-		inv.Groups = append(inv.Groups, *groupMap[key])
+	for _, mk := range modelOrder {
+		inv.ModelGroups = append(inv.ModelGroups, *modelMap[mk])
 	}
 
-	// Sort groups by count descending so the largest groups appear first.
-	sort.Slice(inv.Groups, func(i, j int) bool {
-		return inv.Groups[i].Count > inv.Groups[j].Count
+	// Sort model groups by total count descending.
+	sort.Slice(inv.ModelGroups, func(i, j int) bool {
+		return inv.ModelGroups[i].TotalCount > inv.ModelGroups[j].TotalCount
 	})
+
+	// Sort config subgroups within each model by count descending.
+	for i := range inv.ModelGroups {
+		sort.Slice(inv.ModelGroups[i].ConfigGroups, func(a, b int) bool {
+			return inv.ModelGroups[i].ConfigGroups[a].Count > inv.ModelGroups[i].ConfigGroups[b].Count
+		})
+	}
 
 	return inv
 }
