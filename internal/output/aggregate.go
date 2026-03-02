@@ -93,6 +93,17 @@ func (f *AggregatedConsoleFormatter) FormatAggregated(w io.Writer, inv models.Ag
 					ramSpec += fmt.Sprintf(" @ %d MHz", fp.RAMSpeedMHz)
 				}
 			}
+			if fp.RAMModuleSizeGiB > 0 {
+				moduleCount := 0
+				if len(cg.Servers) > 0 {
+					moduleCount = cg.Servers[0].MemorySlotsUsed
+				}
+				if moduleCount > 0 {
+					ramSpec += fmt.Sprintf("  (%d× %d GiB modules)", moduleCount, fp.RAMModuleSizeGiB)
+				} else {
+					ramSpec += fmt.Sprintf("  (%d GiB/module)", fp.RAMModuleSizeGiB)
+				}
+			}
 			fmt.Fprintf(w, "  %-15s %s\n", "RAM:", ramSpec)
 
 			if fp.RAMSlotsTotal > 0 && len(cg.Servers) > 0 {
