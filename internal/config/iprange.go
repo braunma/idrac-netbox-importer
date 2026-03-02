@@ -54,15 +54,13 @@ func ParseIPRange(rangeStr string) ([]string, error) {
 		return nil, fmt.Errorf("start IP must be <= end IP: %s-%s", startIP, endIP)
 	}
 
-	// Generate all IPs in range
+	// Generate all IPs in range, with an early-exit safety limit.
 	var ips []string
 	for ip := copyIP(start); compareIPs(ip, end) <= 0; incrementIP(ip) {
 		ips = append(ips, ip.String())
-	}
-
-	// Safety check: prevent extremely large ranges
-	if len(ips) > 10000 {
-		return nil, fmt.Errorf("IP range too large (max 10000 IPs): %s contains %d IPs", rangeStr, len(ips))
+		if len(ips) > 10000 {
+			return nil, fmt.Errorf("IP range too large (max 10000 IPs): %s", rangeStr)
+		}
 	}
 
 	return ips, nil
@@ -195,20 +193,6 @@ func ExpandServerInput(input string) ([]string, error) {
 
 	// Otherwise treat as IP or IP range
 	return ParseIPRange(input)
-}
-
-// Helper function to parse IP octets (useful for debugging)
-func ipToOctets(ip net.IP) (byte, byte, byte, byte) {
-	ip = ip.To4()
-	if ip == nil {
-		return 0, 0, 0, 0
-	}
-	return ip[0], ip[1], ip[2], ip[3]
-}
-
-// Helper to convert octets to string
-func octetsToString(a, b, c, d int) string {
-	return fmt.Sprintf("%d.%d.%d.%d", a, b, c, d)
 }
 
 // CountIPsInRange returns how many IPs would be in a range without expanding

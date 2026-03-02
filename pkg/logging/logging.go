@@ -4,7 +4,6 @@
 package logging
 
 import (
-	"os"
 	"sync"
 
 	"go.uber.org/zap"
@@ -221,11 +220,9 @@ func Error(msg string, keysAndValues ...interface{}) {
 // Fatal logs a fatal message and exits the application.
 func Fatal(msg string, keysAndValues ...interface{}) {
 	mu.RLock()
-	logger := globalLogger
-	mu.RUnlock()
+	defer mu.RUnlock()
 	ensureInitialized()
-	logger.Fatalw(msg, keysAndValues...)
-	os.Exit(1)
+	globalLogger.Fatalw(msg, keysAndValues...)
 }
 
 // Sync flushes any buffered log entries.
