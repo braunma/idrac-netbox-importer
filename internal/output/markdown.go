@@ -33,12 +33,13 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 
 	// Quick-reference summary table — one row per model group.
 	fmt.Fprintf(w, "## Summary\n\n")
-	fmt.Fprintf(w, "| # | Count | Model | Configs | CPUs | RAM | RAM Slots | Storage |\n")
-	fmt.Fprintf(w, "|---|-------|-------|---------|------|-----|-----------|--------|\n")
+	fmt.Fprintf(w, "| # | Count | Model | Configs | CPUs | RAM | RAM Type | RAM Slots | Storage |\n")
+	fmt.Fprintf(w, "|---|-------|-------|---------|------|-----|----------|-----------|--------|\n")
 	for i, mg := range inv.ModelGroups {
 		// Show CPU/RAM from the largest config subgroup (first after sort).
 		cpuCol := "-"
 		ramCol := "-"
+		ramTypeCol := "-"
 		ramSlotsCol := "-"
 		storageCol := "-"
 		if len(mg.ConfigGroups) > 0 {
@@ -49,40 +50,34 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 			}
 			ramCol = fmt.Sprintf("%d GiB", fp.RAMTotalGiB)
 			if fp.RAMType != "" {
-				ramCol += " " + fp.RAMType
+				ramTypeCol = fp.RAMType
 				if fp.RAMSpeedMHz > 0 {
-					ramCol += fmt.Sprintf(" @ %s MHz", formatWithCommas(fp.RAMSpeedMHz))
-				}
-			}
-			if fp.RAMModuleSizeGiB > 0 {
-				moduleCount := 0
-				if len(mg.ConfigGroups[0].Servers) > 0 {
-					moduleCount = mg.ConfigGroups[0].Servers[0].MemorySlotsUsed
-				}
-				if moduleCount > 0 {
-					ramCol += fmt.Sprintf(" (%d× %d GiB)", moduleCount, fp.RAMModuleSizeGiB)
-				} else {
-					ramCol += fmt.Sprintf(" (%d GiB/module)", fp.RAMModuleSizeGiB)
+					ramTypeCol += fmt.Sprintf(" @ %s MHz", formatWithCommas(fp.RAMSpeedMHz))
 				}
 			}
 			if fp.RAMSlotsTotal > 0 && len(mg.ConfigGroups[0].Servers) > 0 {
 				s := mg.ConfigGroups[0].Servers[0]
-				ramSlotsCol = fmt.Sprintf("%d/%d (%d free)", s.MemorySlotsUsed, fp.RAMSlotsTotal, s.MemorySlotsFree)
+				if fp.RAMModuleSizeGiB > 0 {
+					ramSlotsCol = fmt.Sprintf("%d/%d × %d GiB (%d free)",
+						s.MemorySlotsUsed, fp.RAMSlotsTotal, fp.RAMModuleSizeGiB, s.MemorySlotsFree)
+				} else {
+					ramSlotsCol = fmt.Sprintf("%d/%d (%d free)", s.MemorySlotsUsed, fp.RAMSlotsTotal, s.MemorySlotsFree)
+				}
 			}
 			storageCol = fp.StorageSummary
 			if len(mg.ConfigGroups) > 1 {
 				storageCol += " *(varies)*"
 			}
 		}
-		fmt.Fprintf(w, "| [%d](#model-%d) | **%d** | %s | %d | %s | %s | %s | %s |\n",
+		fmt.Fprintf(w, "| [%d](#model-%d) | **%d** | %s | %d | %s | %s | %s | %s | %s |\n",
 			i+1, i+1,
 			mg.TotalCount, mg.Model,
 			len(mg.ConfigGroups),
-			cpuCol, ramCol, ramSlotsCol, storageCol,
+			cpuCol, ramCol, ramTypeCol, ramSlotsCol, storageCol,
 		)
 	}
 	if len(inv.FailedServers) > 0 {
-		fmt.Fprintf(w, "| — | **%d** | ❌ Failed | — | — | — | — | — |\n", inv.FailedCount)
+		fmt.Fprintf(w, "| — | **%d** | ❌ Failed | — | — | — | — | — | — |\n", inv.FailedCount)
 	}
 
 	fmt.Fprintf(w, "\n")
@@ -165,29 +160,23 @@ func (f *MarkdownFormatter) writeConfigGroup(w io.Writer, idx int, group models.
 	}
 
 	// RAM rows
-	ramLine := fmt.Sprintf("%d GiB", fp.RAMTotalGiB)
+	fmt.Fprintf(w, "| **RAM** | %d GiB |\n", fp.RAMTotalGiB)
 	if fp.RAMType != "" {
-		ramLine += " " + fp.RAMType
+		ramTypeLine := fp.RAMType
 		if fp.RAMSpeedMHz > 0 {
-			ramLine += fmt.Sprintf(" @ %s MHz", formatWithCommas(fp.RAMSpeedMHz))
+			ramTypeLine += fmt.Sprintf(" @ %s MHz", formatWithCommas(fp.RAMSpeedMHz))
 		}
+		fmt.Fprintf(w, "| **RAM Type** | %s |\n", ramTypeLine)
 	}
-	if fp.RAMModuleSizeGiB > 0 {
-		moduleCount := 0
-		if len(group.Servers) > 0 {
-			moduleCount = group.Servers[0].MemorySlotsUsed
-		}
-		if moduleCount > 0 {
-			ramLine += fmt.Sprintf(" (%d× %d GiB modules)", moduleCount, fp.RAMModuleSizeGiB)
-		} else {
-			ramLine += fmt.Sprintf(" (%d GiB/module)", fp.RAMModuleSizeGiB)
-		}
-	}
-	fmt.Fprintf(w, "| **RAM** | %s |\n", ramLine)
 	if fp.RAMSlotsTotal > 0 && len(group.Servers) > 0 {
 		s := group.Servers[0]
-		fmt.Fprintf(w, "| **RAM Slots** | %d total · %d used · %d free |\n",
-			fp.RAMSlotsTotal, s.MemorySlotsUsed, s.MemorySlotsFree)
+		if fp.RAMModuleSizeGiB > 0 {
+			fmt.Fprintf(w, "| **RAM Slots** | %d/%d × %d GiB (%d free) |\n",
+				s.MemorySlotsUsed, fp.RAMSlotsTotal, fp.RAMModuleSizeGiB, s.MemorySlotsFree)
+		} else {
+			fmt.Fprintf(w, "| **RAM Slots** | %d/%d (%d free) |\n",
+				s.MemorySlotsUsed, fp.RAMSlotsTotal, s.MemorySlotsFree)
+		}
 	}
 
 	// GPU / Accelerator rows ("Beschleuniger" in German iDRAC)
