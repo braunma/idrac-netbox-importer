@@ -33,12 +33,13 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 
 	// Quick-reference summary table — one row per model group.
 	fmt.Fprintf(w, "## Summary\n\n")
-	fmt.Fprintf(w, "| # | Count | Model | Configs | CPUs | RAM | Storage |\n")
-	fmt.Fprintf(w, "|---|-------|-------|---------|------|-----|--------|\n")
+	fmt.Fprintf(w, "| # | Count | Model | Configs | CPUs | RAM | RAM Slots | Storage |\n")
+	fmt.Fprintf(w, "|---|-------|-------|---------|------|-----|-----------|--------|\n")
 	for i, mg := range inv.ModelGroups {
 		// Show CPU/RAM from the largest config subgroup (first after sort).
 		cpuCol := "-"
 		ramCol := "-"
+		slotsCol := "-"
 		storageCol := "-"
 		if len(mg.ConfigGroups) > 0 {
 			fp := mg.ConfigGroups[0].Fingerprint
@@ -50,20 +51,24 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 			if fp.RAMType != "" {
 				ramCol += " " + fp.RAMType
 			}
+			if fp.RAMSlotsTotal > 0 && len(mg.ConfigGroups[0].Servers) > 0 {
+				s := mg.ConfigGroups[0].Servers[0]
+				slotsCol = fmt.Sprintf("%d used / %d free", s.MemorySlotsUsed, s.MemorySlotsFree)
+			}
 			storageCol = fp.StorageSummary
 			if len(mg.ConfigGroups) > 1 {
 				storageCol += " *(varies)*"
 			}
 		}
-		fmt.Fprintf(w, "| [%d](#model-%d) | **%d** | %s | %d | %s | %s | %s |\n",
+		fmt.Fprintf(w, "| [%d](#model-%d) | **%d** | %s | %d | %s | %s | %s | %s |\n",
 			i+1, i+1,
-			mg.TotalCount, mg.DisplayModel(),
+			mg.TotalCount, mg.Model,
 			len(mg.ConfigGroups),
-			cpuCol, ramCol, storageCol,
+			cpuCol, ramCol, slotsCol, storageCol,
 		)
 	}
 	if len(inv.FailedServers) > 0 {
-		fmt.Fprintf(w, "| — | **%d** | ❌ Failed | — | — | — | — |\n", inv.FailedCount)
+		fmt.Fprintf(w, "| — | **%d** | ❌ Failed | — | — | — | — | — |\n", inv.FailedCount)
 	}
 
 	fmt.Fprintf(w, "\n")
@@ -97,7 +102,7 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 
 func (f *MarkdownFormatter) writeModelGroup(w io.Writer, idx int, mg models.ModelGroup) {
 	fmt.Fprintf(w, "<a id=\"model-%d\"></a>\n\n", idx)
-	fmt.Fprintf(w, "### Model %d — %d× %s\n\n", idx, mg.TotalCount, mg.DisplayModel())
+	fmt.Fprintf(w, "### Model %d — %d× %s\n\n", idx, mg.TotalCount, mg.Model)
 
 	if len(mg.ConfigGroups) == 1 {
 		// Single config: render inline without a nested header.
