@@ -50,6 +50,9 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 			ramCol = fmt.Sprintf("%d GiB", fp.RAMTotalGiB)
 			if fp.RAMType != "" {
 				ramCol += " " + fp.RAMType
+				if fp.RAMSpeedMHz > 0 {
+					ramCol += fmt.Sprintf(" @ %s MHz", formatWithCommas(fp.RAMSpeedMHz))
+				}
 			}
 			if fp.RAMSlotsTotal > 0 && len(mg.ConfigGroups[0].Servers) > 0 {
 				s := mg.ConfigGroups[0].Servers[0]
