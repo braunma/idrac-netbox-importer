@@ -11,10 +11,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"time"
-
 	"sort"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 	"idrac-inventory/internal/config"

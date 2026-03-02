@@ -510,7 +510,6 @@ func (s *Scanner) collectMemory(ctx context.Context, client *redfishClient, info
 	var memoryModules []models.MemoryInfo
 	var totalMemoryMiB int
 	slotsUsed := 0
-	slotsFree := 0
 
 	for _, member := range collection.Members {
 		var memory redfish.Memory
@@ -551,8 +550,6 @@ func (s *Scanner) collectMemory(ctx context.Context, client *redfishClient, info
 		if memory.IsPopulated() {
 			slotsUsed++
 			totalMemoryMiB += memory.CapacityMiB
-		} else if memory.IsEmpty() {
-			slotsFree++
 		}
 	}
 

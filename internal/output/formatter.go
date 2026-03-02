@@ -119,7 +119,7 @@ func (f *ConsoleFormatter) formatServer(w io.Writer, info models.ServerInfo) {
 					mem.Slot, mem.CapacityGB(), mem.Type, mem.SpeedMHz)
 				fmt.Fprintf(w, "      %s %s (S/N: %s)\n",
 					mem.Manufacturer, mem.PartNumber, mem.SerialNumber)
-			} else if f.Verbose {
+			} else {
 				fmt.Fprintf(w, "   └─ %s: [empty]\n", mem.Slot)
 			}
 		}
