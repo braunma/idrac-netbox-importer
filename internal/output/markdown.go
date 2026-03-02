@@ -31,50 +31,39 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 
 	fmt.Fprintf(w, "---\n\n")
 
-	// Quick-reference summary table
+	// Quick-reference summary table — one row per model group.
 	fmt.Fprintf(w, "## Summary\n\n")
-	fmt.Fprintf(w, "| # | Count | Model | CPUs | CPU Speed | RAM | RAM Slots | GPUs | Storage |\n")
-	fmt.Fprintf(w, "|---|-------|-------|------|-----------|-----|-----------|------|--------|\n")
-	for i, g := range inv.Groups {
-		fp := g.Fingerprint
-		cpuCol := fmt.Sprintf("%d×", fp.CPUCount)
-		if fp.CPUModel != "" {
-			cpuCol += " " + shortenCPUModel(fp.CPUModel)
-		}
-		speedCol := ""
-		if fp.CPUSpeedMHz > 0 {
-			speedCol = fmt.Sprintf("%.2f GHz", float64(fp.CPUSpeedMHz)/1000)
-		}
-		ramCol := fmt.Sprintf("%d GiB", fp.RAMTotalGiB)
-		if fp.RAMType != "" {
-			ramCol += " " + fp.RAMType
-		}
-		slotsCol := ""
-		if fp.RAMSlotsTotal > 0 && len(g.Servers) > 0 {
-			s := g.Servers[0]
-			slotsCol = fmt.Sprintf("%d/%d used", s.MemorySlotsUsed, fp.RAMSlotsTotal)
-		}
-		gpuCol := "-"
-		if fp.GPUCount > 0 {
-			gpuCol = fmt.Sprintf("%d×", fp.GPUCount)
-			if fp.GPUModel != "" {
-				gpuCol += " " + fp.GPUModel
+	fmt.Fprintf(w, "| # | Count | Model | Configs | CPUs | RAM | Storage |\n")
+	fmt.Fprintf(w, "|---|-------|-------|---------|------|-----|--------|\n")
+	for i, mg := range inv.ModelGroups {
+		// Show CPU/RAM from the largest config subgroup (first after sort).
+		cpuCol := "-"
+		ramCol := "-"
+		storageCol := "-"
+		if len(mg.ConfigGroups) > 0 {
+			fp := mg.ConfigGroups[0].Fingerprint
+			cpuCol = fmt.Sprintf("%d×", fp.CPUCount)
+			if fp.CPUModel != "" {
+				cpuCol += " " + shortenCPUModel(fp.CPUModel)
 			}
-			if fp.GPUMemoryGiB > 0 {
-				gpuCol += fmt.Sprintf(" (%d GB)", fp.GPUMemoryGiB)
+			ramCol = fmt.Sprintf("%d GiB", fp.RAMTotalGiB)
+			if fp.RAMType != "" {
+				ramCol += " " + fp.RAMType
+			}
+			storageCol = fp.StorageSummary
+			if len(mg.ConfigGroups) > 1 {
+				storageCol += " *(varies)*"
 			}
 		}
-		fmt.Fprintf(w, "| [%d](#group-%d) | **%d** | %s | %s | %s | %s | %s | %s | %s |\n",
+		fmt.Fprintf(w, "| [%d](#model-%d) | **%d** | %s | %d | %s | %s | %s |\n",
 			i+1, i+1,
-			g.Count, fp.DisplayModel(),
-			cpuCol, speedCol,
-			ramCol, slotsCol,
-			gpuCol,
-			fp.StorageSummary,
+			mg.TotalCount, mg.DisplayModel(),
+			len(mg.ConfigGroups),
+			cpuCol, ramCol, storageCol,
 		)
 	}
 	if len(inv.FailedServers) > 0 {
-		fmt.Fprintf(w, "| — | **%d** | ❌ Failed | — | — | — | — | — | — |\n", inv.FailedCount)
+		fmt.Fprintf(w, "| — | **%d** | ❌ Failed | — | — | — | — |\n", inv.FailedCount)
 	}
 
 	fmt.Fprintf(w, "\n")
@@ -92,10 +81,10 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 
 	fmt.Fprintf(w, "---\n\n")
 
-	// Per-group detail sections
-	fmt.Fprintf(w, "## Hardware Configuration Groups\n\n")
-	for i, group := range inv.Groups {
-		f.writeGroup(w, i+1, group)
+	// Per-model detail sections
+	fmt.Fprintf(w, "## Hardware Groups\n\n")
+	for i, mg := range inv.ModelGroups {
+		f.writeModelGroup(w, i+1, mg)
 	}
 
 	// Failed servers section
@@ -106,17 +95,40 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 	return nil
 }
 
-func (f *MarkdownFormatter) writeGroup(w io.Writer, idx int, group models.HardwareGroup) {
+func (f *MarkdownFormatter) writeModelGroup(w io.Writer, idx int, mg models.ModelGroup) {
+	fmt.Fprintf(w, "<a id=\"model-%d\"></a>\n\n", idx)
+	fmt.Fprintf(w, "### Model %d — %d× %s\n\n", idx, mg.TotalCount, mg.DisplayModel())
+
+	if len(mg.ConfigGroups) == 1 {
+		// Single config: render inline without a nested header.
+		f.writeConfigGroup(w, 0, mg.ConfigGroups[0], false)
+	} else {
+		// Multiple configs: render each as a sub-section.
+		fmt.Fprintf(w, "> **%d configuration variants** found for this model.\n\n", len(mg.ConfigGroups))
+		for j, cg := range mg.ConfigGroups {
+			f.writeConfigGroup(w, j+1, cg, true)
+		}
+	}
+
+	fmt.Fprintf(w, "---\n\n")
+}
+
+// writeConfigGroup renders one hardware-config subgroup.
+// If showSubheader is true a "#### Configuration N" heading is emitted first.
+func (f *MarkdownFormatter) writeConfigGroup(w io.Writer, idx int, group models.HardwareGroup, showSubheader bool) {
 	fp := group.Fingerprint
 
-	// Anchor for the summary table links (id= is the HTML5 standard; name= is obsolete).
-	fmt.Fprintf(w, "<a id=\"group-%d\"></a>\n\n", idx)
-	fmt.Fprintf(w, "### Group %d — %d× %s\n\n", idx, group.Count, fp.DisplayModel())
+	if showSubheader {
+		fmt.Fprintf(w, "#### Configuration %d — %d server", idx, group.Count)
+		if group.Count != 1 {
+			fmt.Fprintf(w, "s")
+		}
+		fmt.Fprintf(w, "\n\n")
+	}
 
 	// Hardware spec table
 	fmt.Fprintf(w, "| Property | Value |\n")
 	fmt.Fprintf(w, "|----------|-------|\n")
-	fmt.Fprintf(w, "| **Model** | %s |\n", mdEscape(fp.DisplayModel()))
 
 	// CPU rows
 	if fp.CPUModel != "" {
@@ -197,7 +209,6 @@ func (f *MarkdownFormatter) writeGroup(w io.Writer, idx int, group models.Hardwa
 	}
 
 	fmt.Fprintf(w, "\n</details>\n\n")
-	fmt.Fprintf(w, "---\n\n")
 }
 
 func (f *MarkdownFormatter) writeFailedServers(w io.Writer, failed []models.ServerInfo) {

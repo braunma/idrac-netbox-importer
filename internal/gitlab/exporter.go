@@ -110,9 +110,9 @@ func (e *Exporter) Export(inv models.AggregatedInventory) error {
 
 	// Commit.
 	msg := fmt.Sprintf(
-		"inventory: update hardware report %s\n\nScanned: %d | Success: %d | Failed: %d | Groups: %d",
+		"inventory: update hardware report %s\n\nScanned: %d | Success: %d | Failed: %d | Models: %d | Config groups: %d",
 		inv.GeneratedAt.Format("2006-01-02 15:04:05 UTC"),
-		inv.TotalServers, inv.SuccessfulCount, inv.FailedCount, len(inv.Groups),
+		inv.TotalServers, inv.SuccessfulCount, inv.FailedCount, len(inv.ModelGroups), inv.TotalConfigGroups(),
 	)
 	if err := e.gitCommit(msg); err != nil {
 		return fmt.Errorf("git commit failed: %w", err)
@@ -121,7 +121,8 @@ func (e *Exporter) Export(inv models.AggregatedInventory) error {
 		"repo", e.cfg.RepoPath,
 		"branch", e.cfg.Branch,
 		"servers", inv.TotalServers,
-		"groups", len(inv.Groups),
+		"models", len(inv.ModelGroups),
+		"config_groups", inv.TotalConfigGroups(),
 	)
 
 	// Optionally push.
