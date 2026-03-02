@@ -149,6 +149,32 @@ func (f *ConsoleFormatter) formatServer(w io.Writer, info models.ServerInfo) {
 		}
 	}
 
+	// GPUs / Accelerators ("Beschleuniger" in German iDRAC)
+	if info.GPUCount > 0 {
+		fmt.Fprintf(w, "\n%s GPUs/Accelerators: %d installed\n", f.icon("🎮"), info.GPUCount)
+		if f.Verbose {
+			for _, gpu := range info.GPUs {
+				fmt.Fprintf(w, "   └─ %s\n", gpu.Slot)
+				fmt.Fprintf(w, "      %s %s\n", gpu.Manufacturer, gpu.Model)
+				if gpu.MemoryMiB > 0 {
+					memType := gpu.MemoryType
+					if memType == "" {
+						memType = "VRAM"
+					}
+					fmt.Fprintf(w, "      %.0f GB %s\n", gpu.MemoryGB(), memType)
+				}
+				fmt.Fprintf(w, "      Health: %s\n", f.formatHealth(gpu.Health))
+			}
+		} else {
+			gpu := info.GPUs[0]
+			if gpu.MemoryMiB > 0 {
+				fmt.Fprintf(w, "   └─ %s (%.0f GB VRAM each)\n", gpu.Model, gpu.MemoryGB())
+			} else {
+				fmt.Fprintf(w, "   └─ %s\n", gpu.Model)
+			}
+		}
+	}
+
 	// Power Consumption
 	if info.PowerConsumedWatts > 0 || info.PowerPeakWatts > 0 {
 		fmt.Fprintf(w, "\n%s Power Consumption:\n", f.icon("⚡"))
@@ -252,8 +278,8 @@ func (f *TableFormatter) Format(w io.Writer, results []models.ServerInfo, stats 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 
 	// Header
-	fmt.Fprintln(tw, "HOST\tMODEL\tSERVICE TAG\tCPUs\tRAM (GB)\tRAM SLOTS\tDRIVES\tPOWER (W)\tSTATUS")
-	fmt.Fprintln(tw, "----\t-----\t-----------\t----\t--------\t---------\t------\t---------\t------")
+	fmt.Fprintln(tw, "HOST\tMODEL\tSERVICE TAG\tCPUs\tRAM (GB)\tRAM SLOTS\tGPUs\tGPU MODEL\tDRIVES\tPOWER (W)\tSTATUS")
+	fmt.Fprintln(tw, "----\t-----\t-----------\t----\t--------\t---------\t----\t---------\t------\t---------\t------")
 
 	for _, info := range results {
 		status := "OK"
@@ -269,13 +295,20 @@ func (f *TableFormatter) Format(w io.Writer, results []models.ServerInfo, stats 
 			power = "-"
 		}
 
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%.0f\t%s\t%d\t%s\t%s\n",
+		gpuModel := "-"
+		if len(info.GPUs) > 0 {
+			gpuModel = info.GPUs[0].Model
+		}
+
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%.0f\t%s\t%d\t%s\t%d\t%s\t%s\n",
 			info.Host,
 			info.Model,
 			info.ServiceTag,
 			info.CPUCount,
 			info.TotalMemoryGiB,
 			ramSlots,
+			info.GPUCount,
+			gpuModel,
 			info.DriveCount,
 			power,
 			status,
@@ -303,7 +336,7 @@ func NewCSVFormatter() *CSVFormatter {
 // Format outputs results as CSV.
 func (f *CSVFormatter) Format(w io.Writer, results []models.ServerInfo, stats models.CollectionStats) error {
 	// Header
-	fmt.Fprintln(w, "host,model,manufacturer,service_tag,serial,bios_version,power_state,cpu_count,cpu_model,ram_total_gb,ram_slots_total,ram_slots_used,ram_slots_free,drive_count,storage_total_tb,power_consumed_watts,power_peak_watts,status,error")
+	fmt.Fprintln(w, "host,model,manufacturer,service_tag,serial,bios_version,power_state,cpu_count,cpu_model,ram_total_gb,ram_slots_total,ram_slots_used,ram_slots_free,gpu_count,gpu_model,gpu_memory_gb,drive_count,storage_total_tb,power_consumed_watts,power_peak_watts,status,error")
 
 	for _, info := range results {
 		status := "OK"
@@ -313,7 +346,16 @@ func (f *CSVFormatter) Format(w io.Writer, results []models.ServerInfo, stats mo
 			errorMsg = info.Error.Error()
 		}
 
-		fmt.Fprintf(w, "%s,%s,%s,%s,%s,%s,%s,%d,%s,%.0f,%d,%d,%d,%d,%.2f,%d,%d,%s,%s\n",
+		gpuModel := ""
+		gpuMemoryGB := 0
+		if len(info.GPUs) > 0 {
+			gpuModel = info.GPUs[0].Model
+			for _, g := range info.GPUs {
+				gpuMemoryGB += int(g.MemoryGB())
+			}
+		}
+
+		fmt.Fprintf(w, "%s,%s,%s,%s,%s,%s,%s,%d,%s,%.0f,%d,%d,%d,%d,%s,%d,%d,%.2f,%d,%d,%s,%s\n",
 			csvEscape(info.Host),
 			csvEscape(info.Model),
 			csvEscape(info.Manufacturer),
@@ -327,6 +369,9 @@ func (f *CSVFormatter) Format(w io.Writer, results []models.ServerInfo, stats mo
 			info.MemorySlotsTotal,
 			info.MemorySlotsUsed,
 			info.MemorySlotsFree,
+			info.GPUCount,
+			csvEscape(gpuModel),
+			gpuMemoryGB,
 			info.DriveCount,
 			info.TotalStorageTB,
 			info.PowerConsumedWatts,

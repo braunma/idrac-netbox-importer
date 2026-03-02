@@ -33,8 +33,8 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 
 	// Quick-reference summary table
 	fmt.Fprintf(w, "## Summary\n\n")
-	fmt.Fprintf(w, "| # | Count | Model | CPUs | CPU Speed | RAM | RAM Slots | Storage |\n")
-	fmt.Fprintf(w, "|---|-------|-------|------|-----------|-----|-----------|--------|\n")
+	fmt.Fprintf(w, "| # | Count | Model | CPUs | CPU Speed | RAM | RAM Slots | GPUs | Storage |\n")
+	fmt.Fprintf(w, "|---|-------|-------|------|-----------|-----|-----------|------|--------|\n")
 	for i, g := range inv.Groups {
 		fp := g.Fingerprint
 		cpuCol := fmt.Sprintf("%d×", fp.CPUCount)
@@ -54,16 +54,27 @@ func (f *MarkdownFormatter) FormatAggregated(w io.Writer, inv models.AggregatedI
 			s := g.Servers[0]
 			slotsCol = fmt.Sprintf("%d/%d used", s.MemorySlotsUsed, fp.RAMSlotsTotal)
 		}
-		fmt.Fprintf(w, "| [%d](#group-%d) | **%d** | %s | %s | %s | %s | %s | %s |\n",
+		gpuCol := "-"
+		if fp.GPUCount > 0 {
+			gpuCol = fmt.Sprintf("%d×", fp.GPUCount)
+			if fp.GPUModel != "" {
+				gpuCol += " " + fp.GPUModel
+			}
+			if fp.GPUMemoryGiB > 0 {
+				gpuCol += fmt.Sprintf(" (%d GB)", fp.GPUMemoryGiB)
+			}
+		}
+		fmt.Fprintf(w, "| [%d](#group-%d) | **%d** | %s | %s | %s | %s | %s | %s | %s |\n",
 			i+1, i+1,
 			g.Count, fp.DisplayModel(),
 			cpuCol, speedCol,
 			ramCol, slotsCol,
+			gpuCol,
 			fp.StorageSummary,
 		)
 	}
 	if len(inv.FailedServers) > 0 {
-		fmt.Fprintf(w, "| — | **%d** | ❌ Failed | — | — | — | — | — |\n", inv.FailedCount)
+		fmt.Fprintf(w, "| — | **%d** | ❌ Failed | — | — | — | — | — | — |\n", inv.FailedCount)
 	}
 
 	fmt.Fprintf(w, "\n")
@@ -135,6 +146,18 @@ func (f *MarkdownFormatter) writeGroup(w io.Writer, idx int, group models.Hardwa
 		s := group.Servers[0]
 		fmt.Fprintf(w, "| **RAM Slots** | %d total · %d used · %d free |\n",
 			fp.RAMSlotsTotal, s.MemorySlotsUsed, s.MemorySlotsFree)
+	}
+
+	// GPU / Accelerator rows ("Beschleuniger" in German iDRAC)
+	if fp.GPUCount > 0 {
+		gpuLine := fmt.Sprintf("%d×", fp.GPUCount)
+		if fp.GPUModel != "" {
+			gpuLine += " " + fp.GPUModel
+		}
+		if fp.GPUMemoryGiB > 0 {
+			gpuLine += fmt.Sprintf(" · %d GB VRAM each", fp.GPUMemoryGiB)
+		}
+		fmt.Fprintf(w, "| **GPUs/Accelerators** | %s |\n", gpuLine)
 	}
 
 	// Storage rows

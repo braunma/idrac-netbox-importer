@@ -104,6 +104,11 @@ var (
 	NetBoxFieldPowerConsumedWatts   = getEnvOrDefault("NETBOX_FIELD_POWER_CONSUMED_WATTS", "hw_power_consumed_watts")
 	NetBoxFieldPowerPeakWatts       = getEnvOrDefault("NETBOX_FIELD_POWER_PEAK_WATTS", "hw_power_peak_watts")
 	NetBoxFieldLastInventory        = getEnvOrDefault("NETBOX_FIELD_LAST_INVENTORY", "hw_last_inventory")
+
+	// GPU / Accelerator ("Beschleuniger") fields
+	NetBoxFieldGPUCount    = getEnvOrDefault("NETBOX_FIELD_GPU_COUNT", "hw_gpu_count")
+	NetBoxFieldGPUModel    = getEnvOrDefault("NETBOX_FIELD_GPU_MODEL", "hw_gpu_model")
+	NetBoxFieldGPUMemoryGB = getEnvOrDefault("NETBOX_FIELD_GPU_MEMORY_GB", "hw_gpu_memory_gb")
 )
 
 // Helper functions for reading environment variables with defaults

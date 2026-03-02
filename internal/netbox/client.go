@@ -51,6 +51,10 @@ type FieldNames struct {
 	PowerConsumedWatts  string
 	PowerPeakWatts      string
 	LastInventory       string
+	// GPU / Accelerator fields ("Beschleuniger" in German iDRAC)
+	GPUCount    string
+	GPUModel    string
+	GPUMemoryGB string
 }
 
 // DefaultFieldNames returns the default field names from the defaults package.
@@ -73,6 +77,9 @@ func DefaultFieldNames() FieldNames {
 		PowerConsumedWatts: defaults.NetBoxFieldPowerConsumedWatts,
 		PowerPeakWatts:     defaults.NetBoxFieldPowerPeakWatts,
 		LastInventory:      defaults.NetBoxFieldLastInventory,
+		GPUCount:           defaults.NetBoxFieldGPUCount,
+		GPUModel:           defaults.NetBoxFieldGPUModel,
+		GPUMemoryGB:        defaults.NetBoxFieldGPUMemoryGB,
 	}
 }
 
@@ -388,7 +395,50 @@ func (c *Client) buildCustomFields(info models.ServerInfo) map[string]interface{
 		fields[c.fieldNames.PowerPeakWatts] = info.PowerPeakWatts
 	}
 
+	// Add GPU/accelerator data ("Beschleuniger" in German iDRAC)
+	fields[c.fieldNames.GPUCount] = info.GPUCount
+	if len(info.GPUs) > 0 {
+		fields[c.fieldNames.GPUModel] = c.buildGPUSummary(info.GPUs)
+		totalVRAM := 0
+		for _, gpu := range info.GPUs {
+			totalVRAM += gpu.MemoryMiB
+		}
+		if totalVRAM > 0 {
+			fields[c.fieldNames.GPUMemoryGB] = int(totalVRAM / 1024)
+		}
+	}
+
 	return fields
+}
+
+// buildGPUSummary returns a compact summary of installed GPUs.
+// Example: "4× NVIDIA A100 (80 GB)" or "2× NVIDIA H100, 2× NVIDIA A30"
+func (c *Client) buildGPUSummary(gpus []models.GPUInfo) string {
+	type gpuKey struct {
+		model    string
+		memoryGB int
+	}
+	counts := make(map[gpuKey]int)
+	var order []gpuKey
+
+	for _, g := range gpus {
+		k := gpuKey{model: g.Model, memoryGB: int(g.MemoryGB())}
+		if counts[k] == 0 {
+			order = append(order, k)
+		}
+		counts[k]++
+	}
+
+	parts := make([]string, 0, len(order))
+	for _, k := range order {
+		entry := fmt.Sprintf("%d× %s", counts[k], k.model)
+		if k.memoryGB > 0 {
+			entry += fmt.Sprintf(" (%d GB)", k.memoryGB)
+		}
+		parts = append(parts, entry)
+	}
+
+	return strings.Join(parts, ", ")
 }
 
 // buildStorageSummary creates a grouped summary of drives by capacity.

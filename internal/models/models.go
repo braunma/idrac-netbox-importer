@@ -46,6 +46,10 @@ type ServerInfo struct {
 	DriveCount     int         `json:"drive_count"`
 	TotalStorageTB float64     `json:"total_storage_tb"`
 
+	// GPU/Accelerator information ("Beschleuniger" in German iDRAC)
+	GPUs     []GPUInfo `json:"gpus,omitempty"`
+	GPUCount int       `json:"gpu_count"`
+
 	// Power information
 	PowerConsumedWatts int `json:"power_consumed_watts,omitempty"`
 	PowerPeakWatts     int `json:"power_peak_watts,omitempty"`
@@ -214,6 +218,29 @@ func (d DriveInfo) String() string {
 	}
 	return fmt.Sprintf("%s: %.0f GB %s %s (%s)%s",
 		d.Name, d.CapacityGB, d.MediaType, d.Protocol, d.Model, lifeInfo)
+}
+
+// GPUInfo contains information about a GPU or accelerator ("Beschleuniger" in German iDRAC).
+type GPUInfo struct {
+	Slot         string `json:"slot"`
+	Model        string `json:"model"`
+	Manufacturer string `json:"manufacturer"`
+	MemoryMiB    int    `json:"memory_mib"`  // VRAM size in MiB (0 if unknown)
+	MemoryType   string `json:"memory_type"` // e.g. "GDDR6", "HBM2"
+	Health       string `json:"health"`
+}
+
+// MemoryGB returns the GPU VRAM in gigabytes.
+func (g GPUInfo) MemoryGB() float64 {
+	return float64(g.MemoryMiB) / 1024
+}
+
+// String returns a human-readable representation of the GPU.
+func (g GPUInfo) String() string {
+	if g.MemoryMiB > 0 {
+		return fmt.Sprintf("%s: %s (%.0f GB VRAM)", g.Slot, g.Model, g.MemoryGB())
+	}
+	return fmt.Sprintf("%s: %s", g.Slot, g.Model)
 }
 
 // Health status constants.
